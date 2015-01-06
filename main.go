@@ -1,0 +1,350 @@
+package main
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"os"
+	"os/user"
+	"path"
+	"strings"
+	"time"
+
+	"github.com/codegangsta/cli"
+	_ "github.com/mattn/go-sqlite3"
+)
+
+var (
+	TRACKER_DIR, BASE_DB string
+
+	ErrInvalidDB = errors.New("tracker doesnt exist.")
+	ErrNoName    = errors.New("tracker name required.")
+)
+
+func init() {
+	u, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
+	TRACKER_DIR = u.HomeDir + "/Dropbox/tracker/"
+	BASE_DB = "conf/base.db"
+}
+
+func main() {
+	app := cli.NewApp()
+	app.Name = "tracker"
+	app.Commands = []cli.Command{
+		// List
+		{
+			Name:  "list",
+			Usage: "Lists the existing trackers",
+			Action: func(c *cli.Context) {
+				files, err := ioutil.ReadDir(TRACKER_DIR)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+
+				for _, f := range files {
+					n := f.Name()
+					if !f.IsDir() && strings.Contains(n, ".db") {
+						fmt.Println(strings.TrimSuffix(n, ".db"))
+					}
+				}
+			},
+		},
+		// New
+		{
+			Name:  "new",
+			Usage: "Creates a new tracker",
+			Action: func(c *cli.Context) {
+				dbname := c.Args().First()
+				if dbname == "" {
+					fmt.Println("name required.")
+					return
+				}
+
+				p := dbpath(dbname)
+				if exists(p) {
+					fmt.Println("tracker already exists.")
+					return
+				}
+
+				err := create(p)
+				if err != nil {
+					fmt.Println(err)
+				}
+			},
+		},
+		// Add
+		{
+			Name: "add",
+			Flags: []cli.Flag{
+				cli.Float64Flag{
+					Name:  "quantity, qty",
+					Value: 0,
+				},
+				cli.IntFlag{
+					Name:  "category, cat",
+					Value: 1,
+				},
+			},
+			Action: func(c *cli.Context) {
+				var (
+					category int
+					quantity float64
+				)
+
+				if quantity = c.Float64("qty"); quantity == 0 {
+					fmt.Println("no quantity specified.")
+					return
+				}
+
+				db, err := openFromContext(c)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				defer db.Close()
+
+				if category = c.Int("cat"); category != 1 {
+					err = db.QueryRow("select 1 from categories where id = ?", category).Scan()
+					if err != nil {
+						if err == sql.ErrNoRows {
+							fmt.Println("category doesnt exist.")
+						} else {
+							fmt.Println(err)
+						}
+						return
+					}
+				}
+
+				year, week := time.Now().ISOWeek()
+
+				_, err = db.Exec("insert into records(qty, category, isoweek, isoyear) values(?, ?, ?, ?)",
+					quantity, category, week, year)
+				if err != nil {
+					fmt.Println(err)
+				}
+			},
+		},
+		// Category
+		{
+			Name:      "category",
+			ShortName: "cat",
+			Subcommands: []cli.Command{
+				{
+					Name: "list",
+					Action: func(c *cli.Context) {
+						db, err := openFromContext(c)
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+						defer db.Close()
+
+						rows, err := db.Query("select id, name from categories")
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+						defer rows.Close()
+
+						var (
+							id   int64
+							name string
+						)
+						for rows.Next() {
+							err = rows.Scan(&id, &name)
+							if err != nil {
+								fmt.Println(err)
+								return
+							}
+							fmt.Println(id, name)
+						}
+					},
+				},
+				{
+					Name: "add",
+					Action: func(c *cli.Context) {
+						if len(c.Args()) <= 1 {
+							fmt.Println("no categories specified.")
+							return
+						}
+
+						db, err := openFromContext(c)
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+						defer db.Close()
+
+						stmt, err := db.Prepare("insert into categories(name) values(?)")
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+						defer stmt.Close()
+
+						for i := 1; i < len(c.Args()); i++ {
+							_, err = stmt.Exec(c.Args().Get(i))
+							if err != nil {
+								fmt.Println(err)
+								return
+							}
+						}
+					},
+				},
+			},
+		},
+		// aggregate
+		{
+			Name:      "aggregate",
+			ShortName: "agg",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "period, p",
+					Value: "w",
+				},
+				cli.IntFlag{
+					Name:  "occurence, o",
+					Value: 0,
+				},
+			},
+			Action: func(c *cli.Context) {
+				db, err := openFromContext(c)
+				if err != nil {
+					fmt.Println(err)
+					return
+				}
+				defer db.Close()
+
+				if period := c.String("period"); period == "w" {
+					year, week := time.Now().ISOWeek()
+
+					var query string
+					if c.Int("occurence") <= 0 {
+						// query concerns current week
+						query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+							"where isoyear = %d and isoweek = %d group by isoweek", year, week)
+					} else {
+						year, week = computeLimitWeek(year, week, c.Int("o"))
+
+						query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+							"where (isoyear >= %d and isoweek >= %d) "+
+							"or isoyear > %d group by isoweek", year, week, year)
+					}
+
+					rows, err := db.Query(query)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					defer rows.Close()
+
+					var sum float64
+					for rows.Next() {
+						err = rows.Scan(&sum, &year, &week)
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+						fmt.Println(year, week, sum)
+					}
+				} else if period == "m" {
+				} else if period == "y" {
+				}
+
+			},
+		},
+	}
+
+	app.Run(os.Args)
+}
+
+// Helpers
+func open(p string) (*sql.DB, error) {
+	if !exists(p) {
+		create(p)
+	}
+
+	db, err := sql.Open("sqlite3", p)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Ping()
+
+	return db, err
+}
+
+func create(p string) error {
+	in, err := os.Open(path.Join(TRACKER_DIR, BASE_DB))
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(p)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
+}
+
+func exists(p string) bool {
+	if _, err := os.Stat(p); err != nil {
+		if os.IsNotExist(err) {
+			return false
+		}
+	}
+	return true
+}
+
+func openFromContext(c *cli.Context) (*sql.DB, error) {
+	dbname := c.Args().First()
+	if dbname == "" {
+		return nil, ErrNoName
+	}
+
+	p := dbpath(dbname)
+	if !exists(p) {
+		return nil, ErrInvalidDB
+	}
+	return open(p)
+}
+
+func dbpath(name string) string {
+	return path.Join(TRACKER_DIR, name+".db")
+}
+
+func computeLimitWeek(year, week, n int) (int, int) {
+	for n > 0 {
+		week--
+		if week == 0 {
+			year--
+			if isLongYear(year) {
+				week = 53
+			} else {
+				week = 52
+			}
+		}
+		n--
+	}
+	return year, week
+}
+
+func isLongYear(year int) bool {
+	var (
+		start = time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
+		end   = time.Date(year, time.December, 31, 0, 0, 0, 0, time.Local)
+
+		isLeap = year%4 == 0 && year%100 != 0 || year%400 == 0
+	)
+	return (isLeap && (start.Weekday() == time.Wednesday || end.Weekday() == time.Friday)) ||
+		(!isLeap && (start.Weekday() == time.Thursday || end.Weekday() == time.Friday))
+}
