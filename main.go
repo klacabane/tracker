@@ -23,6 +23,55 @@ var (
 	ErrNoName    = errors.New("tracker name required.")
 )
 
+type data interface {
+	sum() float64
+	key() string
+}
+
+type result struct {
+	values []data
+	err    error
+}
+
+type yearData struct {
+	qty  float64
+	year int
+}
+
+func (yd yearData) sum() float64 {
+	return yd.qty
+}
+
+func (yd yearData) key() string {
+	return fmt.Sprintf("%d", yd.year)
+}
+
+type monthData struct {
+	qty   float64
+	month int
+}
+
+func (md monthData) sum() float64 {
+	return md.qty
+}
+
+func (md monthData) key() string {
+	return fmt.Sprintf("%d", md.month)
+}
+
+type weekData struct {
+	qty        float64
+	year, week int
+}
+
+func (wd weekData) sum() float64 {
+	return wd.qty
+}
+
+func (wd weekData) key() string {
+	return fmt.Sprintf("%d-W%d", wd.year, wd.week)
+}
+
 func init() {
 	u, err := user.Current()
 	if err != nil {
@@ -205,6 +254,10 @@ func main() {
 			Name:      "aggregate",
 			ShortName: "agg",
 			Flags: []cli.Flag{
+				cli.StringSliceFlag{
+					Name:  "tracker, t",
+					Value: &cli.StringSlice{},
+				},
 				cli.StringFlag{
 					Name:  "period, p",
 					Value: "w",
@@ -215,49 +268,91 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) {
-				db, err := openFromContext(c)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				defer db.Close()
+				var (
+					period    = c.String("period")
+					occurence = c.Int("occurence")
+					length    = len(c.StringSlice("t"))
 
-				if period := c.String("period"); period == "w" {
-					year, week := time.Now().ISOWeek()
+					ch = make(chan result, length)
+				)
 
-					var query string
-					if c.Int("occurence") <= 0 {
-						// query concerns current week
-						query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-							"where isoyear = %d and isoweek = %d group by isoweek", year, week)
-					} else {
-						year, week = computeLimitWeek(year, week, c.Int("o"))
-
-						query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-							"where (isoyear >= %d and isoweek >= %d) "+
-							"or isoyear > %d group by isoweek", year, week, year)
+				for _, tracker := range c.StringSlice("t") {
+					p := dbpath(tracker)
+					if !exists(p) {
+						fmt.Println(ErrInvalidDB)
+						continue
 					}
 
-					rows, err := db.Query(query)
-					if err != nil {
-						fmt.Println(err)
-						return
-					}
-					defer rows.Close()
+					go func(path string) {
+						var res result
 
-					var sum float64
-					for rows.Next() {
-						err = rows.Scan(&sum, &year, &week)
+						db, err := open(path)
 						if err != nil {
-							fmt.Println(err)
+							res.err = err
+							ch <- res
 							return
 						}
-						fmt.Println(year, week, sum)
-					}
-				} else if period == "m" {
-				} else if period == "y" {
+						defer db.Close()
+
+						if period == "w" {
+							year, week := time.Now().ISOWeek()
+
+							var query string
+							if occurence <= 0 {
+								// query concerns current week
+								query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+									"where isoyear = %d and isoweek = %d group by isoweek", year, week)
+							} else {
+								year, week = computeLimitWeek(year, week, c.Int("o"))
+
+								query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+									"where (isoyear >= %d and isoweek >= %d) "+
+									"or isoyear > %d group by isoweek", year, week, year)
+							}
+
+							rows, err := db.Query(query)
+							if err != nil {
+								res.err = err
+								ch <- res
+								return
+							}
+							defer rows.Close()
+
+							var wdata weekData
+							for rows.Next() {
+								err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
+								if err != nil {
+									res.err = err
+									break
+								}
+								res.values = append(res.values, wdata)
+							}
+							if res.err == nil {
+								res.err = rows.Err()
+							}
+						} else if period == "m" {
+						} else if period == "y" {
+						}
+						ch <- res
+					}(p)
 				}
 
+				var m = make(map[string]float64)
+
+				for i := 0; i < length; i++ {
+					r := <-ch
+					if r.err != nil {
+						fmt.Println(r.err)
+						continue
+					}
+					for _, d := range r.values {
+						m[d.key()] += d.sum()
+					}
+				}
+
+				for k, v := range m {
+					fmt.Println(k, v)
+				}
 			},
 		},
 	}
