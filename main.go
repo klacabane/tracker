@@ -23,13 +23,13 @@ var (
 	ErrNoName    = errors.New("tracker name required.")
 )
 
-type data interface {
+type dataPrinter interface {
 	sum() float64
 	key() string
 }
 
 type result struct {
-	values []data
+	values []dataPrinter
 	err    error
 }
 
@@ -90,17 +90,14 @@ func main() {
 			Name:  "list",
 			Usage: "Lists the existing trackers",
 			Action: func(c *cli.Context) {
-				files, err := ioutil.ReadDir(TRACKER_DIR)
+				trackers, err := dblist()
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
 
-				for _, f := range files {
-					n := f.Name()
-					if !f.IsDir() && strings.Contains(n, ".db") {
-						fmt.Println(strings.TrimSuffix(n, ".db"))
-					}
+				for _, tracker := range trackers {
+					fmt.Println(tracker)
 				}
 			},
 		},
@@ -271,22 +268,32 @@ func main() {
 				var (
 					period    = c.String("period")
 					occurence = c.Int("occurence")
-					length    = len(c.StringSlice("t"))
-
-					ch = make(chan result, length)
+					trackers  = c.StringSlice("t")
 				)
 
-				for _, tracker := range c.StringSlice("t") {
-					p := dbpath(tracker)
-					if !exists(p) {
-						fmt.Println(ErrInvalidDB)
-						continue
-					}
+				if len(trackers) == 1 && trackers[0] == "all" {
+					var err error
 
-					go func(path string) {
+					trackers, err = dblist()
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+				}
+
+				ch := make(chan result, len(trackers))
+				for _, tracker := range trackers {
+					go func(dbname string) {
 						var res result
 
-						db, err := open(path)
+						p := dbpath(dbname)
+						if !exists(p) {
+							res.err = ErrInvalidDB
+							ch <- res
+							return
+						}
+
+						db, err := open(p)
 						if err != nil {
 							res.err = err
 							ch <- res
@@ -294,59 +301,32 @@ func main() {
 						}
 						defer db.Close()
 
-						if period == "w" {
-							year, week := time.Now().ISOWeek()
-
-							var query string
-							if occurence <= 0 {
-								// query concerns current week
-								query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-									"where isoyear = %d and isoweek = %d group by isoweek", year, week)
-							} else {
-								year, week = computeLimitWeek(year, week, c.Int("o"))
-
-								query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-									"where (isoyear >= %d and isoweek >= %d) "+
-									"or isoyear > %d group by isoweek", year, week, year)
-							}
-
-							rows, err := db.Query(query)
-							if err != nil {
-								res.err = err
-								ch <- res
-								return
-							}
-							defer rows.Close()
-
-							var wdata weekData
-							for rows.Next() {
-								err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
-								if err != nil {
-									res.err = err
-									break
-								}
-								res.values = append(res.values, wdata)
-							}
-							if res.err == nil {
-								res.err = rows.Err()
-							}
-						} else if period == "m" {
-						} else if period == "y" {
+						switch period {
+						case "w":
+							res = queryWeek(db, occurence)
+						case "m":
+							res = queryMonth(db, occurence)
+						case "y":
+							res = queryYear(db, occurence)
+						default:
+							res.err = fmt.Errorf("invalid period argument.")
 						}
+
 						ch <- res
-					}(p)
+					}(tracker)
 				}
 
 				var m = make(map[string]float64)
 
-				for i := 0; i < length; i++ {
-					r := <-ch
-					if r.err != nil {
-						fmt.Println(r.err)
+				for i := 0; i < len(trackers); i++ {
+					res := <-ch
+					if res.err != nil {
+						fmt.Println(res.err)
 						continue
 					}
-					for _, d := range r.values {
-						m[d.key()] += d.sum()
+
+					for _, data := range res.values {
+						m[data.key()] += data.sum()
 					}
 				}
 
@@ -358,6 +338,74 @@ func main() {
 	}
 
 	app.Run(os.Args)
+}
+
+func queryWeek(db *sql.DB, occurence int) result {
+	var (
+		year, week = time.Now().ISOWeek()
+
+		res   result
+		query string
+	)
+
+	if occurence <= 0 {
+		// query concerns current week
+		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+			"where isoyear = %d and isoweek = %d group by isoweek", year, week)
+	} else {
+		year, week = computeLimitWeek(year, week, occurence)
+
+		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+			"where (isoyear >= %d and isoweek >= %d) "+
+			"or isoyear > %d group by isoweek", year, week, year)
+	}
+
+	rows, err := db.Query(query)
+	if err != nil {
+		res.err = err
+		return res
+	}
+	defer rows.Close()
+
+	var wdata weekData
+	for rows.Next() {
+		err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
+		if err != nil {
+			res.err = err
+			break
+		}
+		res.values = append(res.values, wdata)
+	}
+
+	if res.err == nil {
+		res.err = rows.Err()
+	}
+	return res
+}
+
+func queryMonth(db *sql.DB, occurrence int) result {
+	return result{}
+}
+
+func queryYear(db *sql.DB, occurence int) result {
+	return result{}
+}
+
+func dblist() ([]string, error) {
+	var names []string
+	files, err := ioutil.ReadDir(TRACKER_DIR)
+	if err != nil {
+		return names, err
+	}
+
+	for _, f := range files {
+		n := f.Name()
+		if !f.IsDir() && strings.Contains(n, ".db") {
+			names = append(names, strings.TrimSuffix(n, ".db"))
+		}
+	}
+
+	return names, nil
 }
 
 // Helpers
