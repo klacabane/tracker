@@ -110,7 +110,8 @@ func main() {
 				defer db.Close()
 
 				if category = c.Int("cat"); category != 1 {
-					err = db.QueryRow("select 1 from categories where id = ?", category).Scan()
+					var exists bool
+					err = db.QueryRow("select 1 from categories where id = ?", category).Scan(&exists)
 					if err != nil {
 						if err == sql.ErrNoRows {
 							fmt.Println("category doesnt exist.")
