@@ -153,7 +153,7 @@ func main() {
 						}
 						defer db.Close()
 
-						err = db.addCategories(c.Args()...)
+						err = db.addCategories(c.Args()[1:]...)
 						if err != nil {
 							fmt.Println(err)
 						}
@@ -234,7 +234,7 @@ func main() {
 						case "y":
 							res = db.queryYear(occurence, category)
 						default:
-							res.err = fmt.Errorf("invalid period argument.")
+							res.err = fmt.Errorf("invalid period flag.")
 						}
 
 						ch <- res
