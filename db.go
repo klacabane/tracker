@@ -26,7 +26,7 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(occurence int) result {
+func (db *DB) queryWeek(occurence, category int) result {
 	var (
 		year, week = time.Now().ISOWeek()
 
@@ -34,16 +34,22 @@ func (db *DB) queryWeek(occurence int) result {
 		query string
 	)
 
+	condition, err := db.catCondition(category)
+	if err != nil {
+		res.err = err
+		return res
+	}
+
 	if occurence <= 0 {
 		// query concerns current week
 		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-			"where isoyear = %d and isoweek = %d group by isoweek", year, week)
+			"where isoyear = %d and isoweek = %d %sgroup by isoweek", year, week, condition)
 	} else {
 		year, week = computeLimitWeek(year, week, occurence)
 
 		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
 			"where (isoyear >= %d and isoweek >= %d) "+
-			"or isoyear > %d group by isoweek", year, week, year)
+			"or isoyear > %d %sgroup by isoweek", year, week, year, condition)
 	}
 
 	rows, err := db.Query(query)
@@ -67,22 +73,34 @@ func (db *DB) queryWeek(occurence int) result {
 	return res
 }
 
-func (db *DB) queryMonth(occurence int) result {
+func (db *DB) queryMonth(occurence, category int) result {
 	var (
 		date        = time.Now()
-		year, month = strconv.Itoa(date.Year()), monthVal(int(date.Month()))
+		year, month = date.Year(), date.Month()
 
 		res   result
 		query string
 	)
 
+	condition, err := db.catCondition(category)
+	if err != nil {
+		res.err = err
+		return res
+	}
+
 	if occurence <= 0 {
 		query = "select sum(qty), isoyear, strftime('%m', date) " +
-			"from records where strftime('%m', date) = " + fmt.Sprintf("'%s' ", month) +
-			"and strftime('%Y', date) = " + fmt.Sprintf("'%s'", year)
+			"from records where strftime('%m', date) = " + fmt.Sprintf("'%s' ", monthVal(int(month))) +
+			"and strftime('%Y', date) = " + fmt.Sprintf("'%s' ", strconv.Itoa(year)) + condition
 	} else {
+		y, m := computeLimitMonth(year, int(month), occurence)
+		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%s' ", monthVal(int(m)))
+
 		query = "select sum(qty), isoyear, strftime('%m', date) " +
-			"from records group by strftime('%Y-%m', date)"
+			"from records where ((strftime('%Y', date) >= " + ystr +
+			"and strftime('%m', date) >= " + mstr + ")" +
+			"or strftime('%Y', date) > " + ystr + ")" + condition +
+			"group by strftime('%Y-%m', date)"
 	}
 
 	rows, err := db.Query(query)
@@ -106,7 +124,7 @@ func (db *DB) queryMonth(occurence int) result {
 	return res
 }
 
-func (db *DB) queryYear(occurence int) result {
+func (db *DB) queryYear(occurence, category int) result {
 	var (
 		year = time.Now().Year()
 
@@ -114,14 +132,20 @@ func (db *DB) queryYear(occurence int) result {
 		query string
 	)
 
+	condition, err := db.catCondition(category)
+	if err != nil {
+		res.err = err
+		return res
+	}
+
 	if occurence <= 0 {
 		query = fmt.Sprintf("select sum(qty), isoyear from records "+
-			"where isoyear = %d", year)
+			"where isoyear = %d %s", year, condition)
 	} else {
 		year = year - occurence
 
 		query = fmt.Sprintf("select sum(qty), isoyear from records "+
-			"where isoyear >= %d group by isoyear", year)
+			"where isoyear >= %d %sgroup by isoyear", year, condition)
 	}
 
 	rows, err := db.Query(query)
@@ -202,6 +226,27 @@ func (db *DB) addRecord(qty float64, category, year, week int) error {
 	_, err := db.Exec("insert into records(qty, category, isoyear, isoweek) values(?, ?, ?, ?)",
 		qty, category, year, week)
 	return err
+}
+
+func (db *DB) catCondition(category int) (string, error) {
+	var cond string
+
+	if category > 0 {
+		_, err := db.getCategory(category)
+		if err != nil {
+			return "", err
+		}
+		cond = fmt.Sprintf("and category = %d ", category)
+	}
+	return cond, nil
+}
+
+func monthVal(m int) string {
+	str := strconv.Itoa(m)
+	if m < 10 {
+		str = "0" + str
+	}
+	return str
 }
 
 // Helpers

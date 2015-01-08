@@ -178,11 +178,16 @@ func main() {
 					Name:  "occurence, o",
 					Value: 0,
 				},
+				cli.IntFlag{
+					Name:  "category, cat",
+					Value: 0,
+				},
 			},
 			Action: func(c *cli.Context) {
 				var (
 					period    = c.String("period")
 					occurence = c.Int("occurence")
+					category  = c.Int("category")
 					trackers  = c.StringSlice("t")
 				)
 
@@ -194,6 +199,11 @@ func main() {
 						fmt.Println(err)
 						return
 					}
+				}
+
+				if len(trackers) > 1 && category != 0 {
+					category = 0
+					fmt.Println("Ignoring category flag.")
 				}
 
 				ch := make(chan result, len(trackers))
@@ -218,11 +228,11 @@ func main() {
 
 						switch period {
 						case "w":
-							res = db.queryWeek(occurence)
+							res = db.queryWeek(occurence, category)
 						case "m":
-							res = db.queryMonth(occurence)
+							res = db.queryMonth(occurence, category)
 						case "y":
-							res = db.queryYear(occurence)
+							res = db.queryYear(occurence, category)
 						default:
 							res.err = fmt.Errorf("invalid period argument.")
 						}
@@ -262,6 +272,18 @@ func main() {
 func printTotal(total float64) {
 	fmt.Println("------------")
 	fmt.Println("total:", total)
+}
+
+func computeLimitMonth(year, month, n int) (int, int) {
+	for n > 0 {
+		month--
+		if month == 0 {
+			year--
+			month = 12
+		}
+		n--
+	}
+	return year, month
 }
 
 func computeLimitWeek(year, week, n int) (int, int) {
