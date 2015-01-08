@@ -1,76 +1,17 @@
 package main
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"os/user"
-	"path"
-	"strings"
 	"time"
 
 	"github.com/codegangsta/cli"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
 	TRACKER_DIR, BASE_DB string
-
-	ErrInvalidDB = errors.New("tracker doesnt exist.")
-	ErrNoName    = errors.New("tracker name required.")
 )
-
-type dataPrinter interface {
-	sum() float64
-	key() string
-}
-
-type result struct {
-	values []dataPrinter
-	err    error
-}
-
-type yearData struct {
-	qty  float64
-	year int
-}
-
-func (yd yearData) sum() float64 {
-	return yd.qty
-}
-
-func (yd yearData) key() string {
-	return fmt.Sprintf("%d", yd.year)
-}
-
-type monthData struct {
-	qty   float64
-	month int
-}
-
-func (md monthData) sum() float64 {
-	return md.qty
-}
-
-func (md monthData) key() string {
-	return fmt.Sprintf("%d", md.month)
-}
-
-type weekData struct {
-	qty        float64
-	year, week int
-}
-
-func (wd weekData) sum() float64 {
-	return wd.qty
-}
-
-func (wd weekData) key() string {
-	return fmt.Sprintf("%d-W%d", wd.year, wd.week)
-}
 
 func init() {
 	u, err := user.Current()
@@ -156,22 +97,16 @@ func main() {
 				defer db.Close()
 
 				if category = c.Int("cat"); category != 1 {
-					var exists bool
-					err = db.QueryRow("select 1 from categories where id = ?", category).Scan(&exists)
+					_, err = db.getCategory(category)
 					if err != nil {
-						if err == sql.ErrNoRows {
-							fmt.Println("category doesnt exist.")
-						} else {
-							fmt.Println(err)
-						}
+						fmt.Println(err)
 						return
 					}
 				}
 
 				year, week := time.Now().ISOWeek()
 
-				_, err = db.Exec("insert into records(qty, category, isoweek, isoyear) values(?, ?, ?, ?)",
-					quantity, category, week, year)
+				err = db.addRecord(quantity, category, year, week)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -192,24 +127,14 @@ func main() {
 						}
 						defer db.Close()
 
-						rows, err := db.Query("select id, name from categories")
+						categories, err := db.getCategories()
 						if err != nil {
 							fmt.Println(err)
 							return
 						}
-						defer rows.Close()
 
-						var (
-							id   int64
-							name string
-						)
-						for rows.Next() {
-							err = rows.Scan(&id, &name)
-							if err != nil {
-								fmt.Println(err)
-								return
-							}
-							fmt.Println(id, name)
+						for k, v := range categories {
+							fmt.Println(k, v)
 						}
 					},
 				},
@@ -228,19 +153,9 @@ func main() {
 						}
 						defer db.Close()
 
-						stmt, err := db.Prepare("insert into categories(name) values(?)")
+						err = db.addCategories(c.Args()...)
 						if err != nil {
 							fmt.Println(err)
-							return
-						}
-						defer stmt.Close()
-
-						for i := 1; i < len(c.Args()); i++ {
-							_, err = stmt.Exec(c.Args().Get(i))
-							if err != nil {
-								fmt.Println(err)
-								return
-							}
 						}
 					},
 				},
@@ -303,11 +218,11 @@ func main() {
 
 						switch period {
 						case "w":
-							res = queryWeek(db, occurence)
+							res = db.queryWeek(occurence)
 						case "m":
-							res = queryMonth(db, occurence)
+							res = db.queryMonth(occurence)
 						case "y":
-							res = queryYear(db, occurence)
+							res = db.queryYear(occurence)
 						default:
 							res.err = fmt.Errorf("invalid period argument.")
 						}
@@ -318,6 +233,7 @@ func main() {
 
 				var m = make(map[string]float64)
 
+				var total float64
 				for i := 0; i < len(trackers); i++ {
 					res := <-ch
 					if res.err != nil {
@@ -327,12 +243,15 @@ func main() {
 
 					for _, data := range res.values {
 						m[data.key()] += data.sum()
+						total += data.sum()
+
 					}
 				}
 
 				for k, v := range m {
 					fmt.Println(k, v)
 				}
+				printTotal(total)
 			},
 		},
 	}
@@ -340,130 +259,9 @@ func main() {
 	app.Run(os.Args)
 }
 
-func queryWeek(db *sql.DB, occurence int) result {
-	var (
-		year, week = time.Now().ISOWeek()
-
-		res   result
-		query string
-	)
-
-	if occurence <= 0 {
-		// query concerns current week
-		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-			"where isoyear = %d and isoweek = %d group by isoweek", year, week)
-	} else {
-		year, week = computeLimitWeek(year, week, occurence)
-
-		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-			"where (isoyear >= %d and isoweek >= %d) "+
-			"or isoyear > %d group by isoweek", year, week, year)
-	}
-
-	rows, err := db.Query(query)
-	if err != nil {
-		res.err = err
-		return res
-	}
-	defer rows.Close()
-
-	var wdata weekData
-	for rows.Next() {
-		err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
-		if err != nil {
-			res.err = err
-			break
-		}
-		res.values = append(res.values, wdata)
-	}
-
-	if res.err == nil {
-		res.err = rows.Err()
-	}
-	return res
-}
-
-func queryMonth(db *sql.DB, occurrence int) result {
-	return result{}
-}
-
-func queryYear(db *sql.DB, occurence int) result {
-	return result{}
-}
-
-func dblist() ([]string, error) {
-	var names []string
-	files, err := ioutil.ReadDir(TRACKER_DIR)
-	if err != nil {
-		return names, err
-	}
-
-	for _, f := range files {
-		n := f.Name()
-		if !f.IsDir() && strings.Contains(n, ".db") {
-			names = append(names, strings.TrimSuffix(n, ".db"))
-		}
-	}
-
-	return names, nil
-}
-
-// Helpers
-func open(p string) (*sql.DB, error) {
-	if !exists(p) {
-		create(p)
-	}
-
-	db, err := sql.Open("sqlite3", p)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Ping()
-
-	return db, err
-}
-
-func create(p string) error {
-	in, err := os.Open(path.Join(TRACKER_DIR, BASE_DB))
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(p)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
-	return err
-}
-
-func exists(p string) bool {
-	if _, err := os.Stat(p); err != nil {
-		if os.IsNotExist(err) {
-			return false
-		}
-	}
-	return true
-}
-
-func openFromContext(c *cli.Context) (*sql.DB, error) {
-	dbname := c.Args().First()
-	if dbname == "" {
-		return nil, ErrNoName
-	}
-
-	p := dbpath(dbname)
-	if !exists(p) {
-		return nil, ErrInvalidDB
-	}
-	return open(p)
-}
-
-func dbpath(name string) string {
-	return path.Join(TRACKER_DIR, name+".db")
+func printTotal(total float64) {
+	fmt.Println("------------")
+	fmt.Println("total:", total)
 }
 
 func computeLimitWeek(year, week, n int) (int, int) {
