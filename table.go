@@ -76,19 +76,19 @@ func (t *Table) computeRowSep() {
 
 func (t *Table) printRow(key string, val float64) {
 	var (
-		dif    = t.lenkey - len(key)
+		diff   = t.lenkey - len(key)
 		rowtpl = "|  %s"
 	)
 
-	if dif > 0 {
-		for i := 0; i < dif; i++ {
+	if diff > 0 {
+		for i := 0; i < diff; i++ {
 			rowtpl += " "
 		}
 	}
 	rowtpl += "  |  %.2f"
 
-	if dif = t.lenval - (len(strconv.Itoa(int(val))) + 3); dif > 0 {
-		for i := 0; i < dif; i++ {
+	if diff = t.lenval - (len(strconv.Itoa(int(val))) + 3); diff > 0 {
+		for i := 0; i < diff; i++ {
 			rowtpl += " "
 		}
 	}
@@ -100,23 +100,28 @@ func (t *Table) printRow(key string, val float64) {
 
 func (t *Table) printTitle() {
 	var (
-		dif    = (len(t.sep) - t.padding*2) - len(t.title)
+		diff   = (len(t.sep) - (t.padding*2 + 2)) /*padding+borders*/ - len(t.title)
 		rowtpl = "|  %s"
 	)
 
-	if dif > 0 {
-		for i := 0; i < dif; i++ {
+	if diff > 0 {
+		for i := 0; i < diff; i++ {
 			rowtpl += " "
 		}
-	} else if dif < 0 {
+	} else if diff < 0 {
+		complet := -diff / 2
 		// title is larger than the rows,
-		// add dif to cells
-		t.lenval += -dif / 2
-		t.lenkey += -dif / 2
+		// add diff to cells
+		t.lenval += complet
+		t.lenkey += complet
+
+		if -diff%2 > 0 {
+			t.lenkey++
+		}
 
 		t.computeRowSep()
 	}
-	rowtpl += "|\n"
+	rowtpl += "  |\n"
 
 	t.printSep()
 	fmt.Printf(rowtpl, t.title)

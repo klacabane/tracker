@@ -193,6 +193,11 @@ func main() {
 					trackers  = c.StringSlice("t")
 				)
 
+				if period != "w" && period != "m" && period != "y" {
+					fmt.Println("invalid period flag.")
+					return
+				}
+
 				if len(trackers) == 1 && trackers[0] == "all" {
 					var err error
 
@@ -243,8 +248,6 @@ func main() {
 							res.values, res.err = db.queryMonth(occurence, category)
 						case "y":
 							res.values, res.err = db.queryYear(occurence, category)
-						default:
-							res.err = fmt.Errorf("invalid period flag.")
 						}
 
 						ch <- res
