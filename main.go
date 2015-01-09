@@ -210,7 +210,7 @@ func main() {
 
 				if len(trackers) > 1 && category != 0 {
 					category = 0
-					fmt.Println("Ignoring category flag.")
+					fmt.Println("ignoring category flag.")
 				}
 
 				ch := make(chan result, len(trackers))

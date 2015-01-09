@@ -29,15 +29,11 @@ type DB struct {
 func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
 	var (
 		year, week = time.Now().ISOWeek()
+		condition  = catCondition(category)
 		res        = make([]dataPrinter, 0)
 
 		query string
 	)
-
-	condition, err := db.catCondition(category)
-	if err != nil {
-		return res, err
-	}
 
 	if occurence <= 0 {
 		// query concerns current week
@@ -76,15 +72,11 @@ func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
 	var (
 		date        = time.Now()
 		year, month = date.Year(), date.Month()
+		condition   = catCondition(category)
 		res         = make([]dataPrinter, 0)
 
 		query string
 	)
-
-	condition, err := db.catCondition(category)
-	if err != nil {
-		return res, err
-	}
 
 	if occurence <= 0 {
 		query = "select quantity, isoyear, month from (" +
@@ -125,16 +117,12 @@ func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
 
 func (db *DB) queryYear(occurence, category int) ([]dataPrinter, error) {
 	var (
-		year = time.Now().Year()
-		res  = make([]dataPrinter, 0)
+		year      = time.Now().Year()
+		condition = catCondition(category)
+		res       = make([]dataPrinter, 0)
 
 		query string
 	)
-
-	condition, err := db.catCondition(category)
-	if err != nil {
-		return res, err
-	}
 
 	if occurence <= 0 {
 		query = fmt.Sprintf("select quantity, isoyear from ("+
@@ -225,13 +213,11 @@ func (db *DB) addRecord(qty float64, category, year, week int) error {
 	return err
 }
 
-func (db *DB) catCondition(category int) (string, error) {
-	var cond string
-
+func catCondition(category int) (cond string) {
 	if category > 0 {
 		cond = fmt.Sprintf("and category = %d ", category)
 	}
-	return cond, nil
+	return
 }
 
 func monthVal(m int) string {
