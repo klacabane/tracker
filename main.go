@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"strings"
 	"time"
 
 	"github.com/codegangsta/cli"
@@ -37,9 +38,14 @@ func main() {
 					return
 				}
 
+				table := NewTable()
+				table.SetTitle("TRACKERS LIST")
+				table.IsSingle()
+
 				for _, tracker := range trackers {
-					fmt.Println(tracker)
+					table.Append(tracker, 0)
 				}
+				table.Print()
 			},
 		},
 		// New
@@ -132,10 +138,14 @@ func main() {
 							fmt.Println(err)
 							return
 						}
+						table := NewTable()
+						table.SetTitle("CATEGORIES")
+						table.IsSingle()
 
 						for k, v := range categories {
-							fmt.Println(k, v)
+							table.Append(v, float64(k))
 						}
+						table.Print()
 					},
 				},
 				{
@@ -267,7 +277,7 @@ func main() {
 					}
 
 					if len(res.title) > 0 {
-						table.SetTitle(res.title)
+						table.SetTitle(strings.ToUpper(res.title))
 					}
 				}
 
