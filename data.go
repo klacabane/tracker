@@ -11,6 +11,7 @@ type dataPrinter interface {
 
 type result struct {
 	values []dataPrinter
+	title  string
 	err    error
 }
 
@@ -50,5 +51,5 @@ func (wd weekData) sum() float64 {
 }
 
 func (wd weekData) key() string {
-	return fmt.Sprintf("%d-W%d", wd.year, wd.week)
+	return fmt.Sprintf("%d-W%s", wd.year, monthVal(wd.week))
 }

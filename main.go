@@ -185,6 +185,8 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
+					table = NewTable()
+
 					period    = c.String("period")
 					occurence = c.Int("occurence")
 					category  = c.Int("category")
@@ -226,13 +228,21 @@ func main() {
 						}
 						defer db.Close()
 
+						if category != 0 {
+							res.title, res.err = db.getCategory(category)
+							if res.err != nil {
+								ch <- res
+								return
+							}
+						}
+
 						switch period {
 						case "w":
-							res = db.queryWeek(occurence, category)
+							res.values, res.err = db.queryWeek(occurence, category)
 						case "m":
-							res = db.queryMonth(occurence, category)
+							res.values, res.err = db.queryMonth(occurence, category)
 						case "y":
-							res = db.queryYear(occurence, category)
+							res.values, res.err = db.queryYear(occurence, category)
 						default:
 							res.err = fmt.Errorf("invalid period flag.")
 						}
@@ -241,9 +251,6 @@ func main() {
 					}(tracker)
 				}
 
-				var m = make(map[string]float64)
-
-				var total float64
 				for i := 0; i < len(trackers); i++ {
 					res := <-ch
 					if res.err != nil {
@@ -252,26 +259,19 @@ func main() {
 					}
 
 					for _, data := range res.values {
-						m[data.key()] += data.sum()
-						total += data.sum()
+						table.Data[data.key()] += data.sum()
+					}
 
+					if len(res.title) > 0 {
+						table.SetTitle(res.title)
 					}
 				}
-
-				for k, v := range m {
-					fmt.Println(k, v)
-				}
-				printTotal(total)
+				table.Print()
 			},
 		},
 	}
 
 	app.Run(os.Args)
-}
-
-func printTotal(total float64) {
-	fmt.Println("------------")
-	fmt.Println("total:", total)
 }
 
 func computeLimitMonth(year, month, n int) (int, int) {

@@ -26,18 +26,17 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(occurence, category int) result {
+func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
 	var (
 		year, week = time.Now().ISOWeek()
+		res        = make([]dataPrinter, 0)
 
-		res   result
 		query string
 	)
 
 	condition, err := db.catCondition(category)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 
 	if occurence <= 0 {
@@ -54,8 +53,7 @@ func (db *DB) queryWeek(occurence, category int) result {
 
 	rows, err := db.Query(query)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 	defer rows.Close()
 
@@ -63,29 +61,26 @@ func (db *DB) queryWeek(occurence, category int) result {
 	for rows.Next() {
 		err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
 		if err != nil {
-			res.err = err
-			return res
+			return res, err
 		}
-		res.values = append(res.values, wdata)
+		res = append(res, wdata)
 	}
 
-	res.err = rows.Err()
-	return res
+	return res, rows.Err()
 }
 
-func (db *DB) queryMonth(occurence, category int) result {
+func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
 	var (
 		date        = time.Now()
 		year, month = date.Year(), date.Month()
+		res         = make([]dataPrinter, 0)
 
-		res   result
 		query string
 	)
 
 	condition, err := db.catCondition(category)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 
 	if occurence <= 0 {
@@ -105,8 +100,7 @@ func (db *DB) queryMonth(occurence, category int) result {
 
 	rows, err := db.Query(query)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 	defer rows.Close()
 
@@ -114,28 +108,25 @@ func (db *DB) queryMonth(occurence, category int) result {
 	for rows.Next() {
 		err = rows.Scan(&mdata.qty, &mdata.year, &mdata.month)
 		if err != nil {
-			res.err = err
-			return res
+			return res, err
 		}
-		res.values = append(res.values, mdata)
+		res = append(res, mdata)
 	}
 
-	res.err = rows.Err()
-	return res
+	return res, rows.Err()
 }
 
-func (db *DB) queryYear(occurence, category int) result {
+func (db *DB) queryYear(occurence, category int) ([]dataPrinter, error) {
 	var (
 		year = time.Now().Year()
+		res  = make([]dataPrinter, 0)
 
-		res   result
 		query string
 	)
 
 	condition, err := db.catCondition(category)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 
 	if occurence <= 0 {
@@ -150,8 +141,7 @@ func (db *DB) queryYear(occurence, category int) result {
 
 	rows, err := db.Query(query)
 	if err != nil {
-		res.err = err
-		return res
+		return res, err
 	}
 	defer rows.Close()
 
@@ -159,14 +149,12 @@ func (db *DB) queryYear(occurence, category int) result {
 	for rows.Next() {
 		err = rows.Scan(&ydata.qty, &ydata.year)
 		if err != nil {
-			res.err = err
-			return res
+			return res, err
 		}
-		res.values = append(res.values, ydata)
+		res = append(res, ydata)
 	}
 
-	res.err = rows.Err()
-	return res
+	return res, rows.Err()
 }
 
 func (db *DB) addCategories(names ...string) error {
@@ -232,10 +220,6 @@ func (db *DB) catCondition(category int) (string, error) {
 	var cond string
 
 	if category > 0 {
-		_, err := db.getCategory(category)
-		if err != nil {
-			return "", err
-		}
 		cond = fmt.Sprintf("and category = %d ", category)
 	}
 	return cond, nil
