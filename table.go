@@ -39,13 +39,16 @@ func NewTable() *Table {
 
 func (t *Table) Print() {
 	t.computeRowSep()
+
 	if len(t.title) > 0 {
+		t.printSep()
 		t.printTitle()
 	}
 	t.printSep()
 
 	for _, row := range t.rows {
 		t.printRow(row)
+		t.printSep()
 	}
 }
 
@@ -142,7 +145,6 @@ func (t *Table) printRow(r row) {
 	} else {
 		fmt.Printf(rowtpl, r.key, r.value)
 	}
-	t.printSep()
 }
 
 func (t *Table) printTitle() {
@@ -155,7 +157,6 @@ func (t *Table) printTitle() {
 	}
 	rowtpl += TPL_TAIL
 
-	t.printSep()
 	fmt.Printf(rowtpl, t.title)
 }
 

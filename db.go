@@ -26,11 +26,11 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
+func (db *DB) queryWeek(occurence, category int) ([]dataFormatter, error) {
 	var (
 		year, week = time.Now().ISOWeek()
 		condition  = catCondition(category)
-		res        = make([]dataPrinter, 0)
+		res        = make([]dataFormatter, 0)
 
 		query string
 	)
@@ -68,12 +68,12 @@ func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
+func (db *DB) queryMonth(occurence, category int) ([]dataFormatter, error) {
 	var (
 		date        = time.Now()
 		year, month = date.Year(), date.Month()
 		condition   = catCondition(category)
-		res         = make([]dataPrinter, 0)
+		res         = make([]dataFormatter, 0)
 
 		query string
 	)
@@ -115,11 +115,11 @@ func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) queryYear(occurence, category int) ([]dataPrinter, error) {
+func (db *DB) queryYear(occurence, category int) ([]dataFormatter, error) {
 	var (
 		year      = time.Now().Year()
 		condition = catCondition(category)
-		res       = make([]dataPrinter, 0)
+		res       = make([]dataFormatter, 0)
 
 		query string
 	)

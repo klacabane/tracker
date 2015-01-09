@@ -143,7 +143,7 @@ func main() {
 						table.SetSingle(true)
 
 						for k, v := range categories {
-							table.Append(v, float64(k))
+							table.Append(fmt.Sprintf("%d %s", k, v), 0)
 						}
 						table.Print()
 					},

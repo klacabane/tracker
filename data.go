@@ -4,13 +4,13 @@ import (
 	"fmt"
 )
 
-type dataPrinter interface {
+type dataFormatter interface {
 	sum() float64
 	key() string
 }
 
 type result struct {
-	values []dataPrinter
+	values []dataFormatter
 	title  string
 	err    error
 }
