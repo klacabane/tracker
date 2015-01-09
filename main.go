@@ -254,6 +254,7 @@ func main() {
 					}(tracker)
 				}
 
+				var rows = make(map[string]float64)
 				for i := 0; i < len(trackers); i++ {
 					res := <-ch
 					if res.err != nil {
@@ -262,13 +263,21 @@ func main() {
 					}
 
 					for _, data := range res.values {
-						table.Data[data.key()] += data.sum()
+						rows[data.key()] += data.sum()
 					}
 
 					if len(res.title) > 0 {
 						table.SetTitle(res.title)
 					}
 				}
+
+				var total float64
+				for k, v := range rows {
+					total += v
+					table.Append(k, v)
+				}
+				table.Append("Total", total)
+
 				table.Print()
 			},
 		},

@@ -6,8 +6,7 @@ import (
 )
 
 type Table struct {
-	Data map[string]float64
-
+	rows []row
 	// row separator
 	sep string
 	// title of the table
@@ -20,9 +19,14 @@ type Table struct {
 	padding int
 }
 
+type row struct {
+	key   string
+	value float64
+}
+
 func NewTable() *Table {
 	return &Table{
-		Data:    make(map[string]float64),
+		rows:    make([]row, 0),
 		padding: 2,
 	}
 }
@@ -34,12 +38,13 @@ func (t *Table) Print() {
 	}
 	t.printSep()
 
-	var total float64
-	for k, v := range t.Data {
-		total += v
-		t.printRow(k, v)
+	for _, row := range t.rows {
+		t.printRow(row)
 	}
-	t.printRow("Total", total)
+}
+
+func (t *Table) Append(key string, value float64) {
+	t.rows = append(t.rows, row{key, value})
 }
 
 func (t *Table) SetTitle(title string) {
@@ -47,20 +52,13 @@ func (t *Table) SetTitle(title string) {
 }
 
 func (t *Table) computeRowSep() {
-	for k, v := range t.Data {
-		if lenkey := len(k); lenkey > t.lenkey {
+	for _, row := range t.rows {
+		if lenkey := len(row.key); lenkey > t.lenkey {
 			t.lenkey = lenkey
 		}
-		if lenval := len(strconv.FormatFloat(v, 'f', 2, 64)); lenval > t.lenval {
+		if lenval := len(strconv.FormatFloat(row.value, 'f', 2, 64)); lenval > t.lenval {
 			t.lenval = lenval
 		}
-	}
-
-	if t.lenkey < 5 {
-		t.lenkey = 5 // len("Total")
-	}
-	if t.lenval < 4 {
-		t.lenval = 4 // len("0.00")
 	}
 
 	t.sep = "+"
@@ -74,9 +72,9 @@ func (t *Table) computeRowSep() {
 	t.sep += "+"
 }
 
-func (t *Table) printRow(key string, val float64) {
+func (t *Table) printRow(r row) {
 	var (
-		diff   = t.lenkey - len(key)
+		diff   = t.lenkey - len(r.key)
 		rowtpl = "|  %s"
 	)
 
@@ -87,14 +85,14 @@ func (t *Table) printRow(key string, val float64) {
 	}
 	rowtpl += "  |  %.2f"
 
-	if diff = t.lenval - (len(strconv.Itoa(int(val))) + 3); diff > 0 {
+	if diff = t.lenval - len(strconv.FormatFloat(r.value, 'f', 2, 64)); diff > 0 {
 		for i := 0; i < diff; i++ {
 			rowtpl += " "
 		}
 	}
 	rowtpl += "  |\n"
 
-	fmt.Printf(rowtpl, key, val)
+	fmt.Printf(rowtpl, r.key, r.value)
 	t.printSep()
 }
 
