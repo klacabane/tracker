@@ -41,14 +41,17 @@ func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
 
 	if occurence <= 0 {
 		// query concerns current week
-		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
-			"where isoyear = %d and isoweek = %d %sgroup by isoweek", year, week, condition)
+		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
+			"select sum(qty) as quantity, isoyear, isoweek from records "+
+			"where isoyear = %d and isoweek = %d %sgroup by isoweek"+
+			") where quantity is not null", year, week, condition)
 	} else {
 		year, week = computeLimitWeek(year, week, occurence)
 
-		query = fmt.Sprintf("select sum(qty), isoyear, isoweek from records "+
+		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
+			"select sum(qty), isoyear, isoweek from records "+
 			"where (isoyear >= %d and isoweek >= %d) "+
-			"or isoyear > %d %sgroup by isoweek", year, week, year, condition)
+			"or isoyear > %d %sgroup by isoweek) where quantity is not null", year, week, year, condition)
 	}
 
 	rows, err := db.Query(query)
@@ -84,18 +87,22 @@ func (db *DB) queryMonth(occurence, category int) ([]dataPrinter, error) {
 	}
 
 	if occurence <= 0 {
-		query = "select sum(qty), isoyear, strftime('%m', date) " +
+		query = "select quantity, isoyear, month from (" +
+			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
 			"from records where strftime('%m', date) = " + fmt.Sprintf("'%s' ", monthVal(int(month))) +
-			"and strftime('%Y', date) = " + fmt.Sprintf("'%s' ", strconv.Itoa(year)) + condition
+			"and strftime('%Y', date) = " + fmt.Sprintf("'%s' ", strconv.Itoa(year)) + condition +
+			") where quantity is not null"
 	} else {
 		y, m := computeLimitMonth(year, int(month), occurence)
 		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%s' ", monthVal(int(m)))
 
-		query = "select sum(qty), isoyear, strftime('%m', date) " +
+		query = "select quantity, isoyear, month from (" +
+			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
 			"from records where ((strftime('%Y', date) >= " + ystr +
 			"and strftime('%m', date) >= " + mstr + ")" +
 			"or strftime('%Y', date) > " + ystr + ")" + condition +
-			"group by strftime('%Y-%m', date)"
+			"group by strftime('%Y-%m', date)" +
+			") where quantity is not null"
 	}
 
 	rows, err := db.Query(query)
@@ -130,13 +137,15 @@ func (db *DB) queryYear(occurence, category int) ([]dataPrinter, error) {
 	}
 
 	if occurence <= 0 {
-		query = fmt.Sprintf("select sum(qty), isoyear from records "+
-			"where isoyear = %d %s", year, condition)
+		query = fmt.Sprintf("select quantity, isoyear from ("+
+			"select sum(qty) as quantity, isoyear from records "+
+			"where isoyear = %d %s) where quantity is not null", year, condition)
 	} else {
 		year = year - occurence
 
-		query = fmt.Sprintf("select sum(qty), isoyear from records "+
-			"where isoyear >= %d %sgroup by isoyear", year, condition)
+		query = fmt.Sprintf("select quantity, isoyear from("+
+			"select sum(qty) as quantity, isoyear from records "+
+			"where isoyear >= %d %sgroup by isoyear) where quantity is not null", year, condition)
 	}
 
 	rows, err := db.Query(query)
