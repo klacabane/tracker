@@ -16,11 +16,14 @@ type Table struct {
 	// of the Data map.
 	// Used to build rows with proper alignment
 	lenkey, lenval int
+
+	padding int
 }
 
 func NewTable() *Table {
 	return &Table{
-		Data: make(map[string]float64),
+		Data:    make(map[string]float64),
+		padding: 2,
 	}
 }
 
@@ -44,8 +47,6 @@ func (t *Table) SetTitle(title string) {
 }
 
 func (t *Table) computeRowSep() {
-	var padding = 2
-
 	for k, v := range t.Data {
 		if len(k) > t.lenkey {
 			t.lenkey = len(k)
@@ -63,11 +64,11 @@ func (t *Table) computeRowSep() {
 	}
 
 	t.sep = "+"
-	for i := 0; i < t.lenkey+padding*2; i++ {
+	for i := 0; i < t.lenkey+t.padding*2; i++ {
 		t.sep += "-"
 	}
 	t.sep += "+"
-	for i := 0; i < t.lenval+padding*2; i++ {
+	for i := 0; i < t.lenval+t.padding*2; i++ {
 		t.sep += "-"
 	}
 	t.sep += "+"
@@ -78,20 +79,20 @@ func (t *Table) printSep() {
 }
 
 func (t *Table) printRow(key string, val float64) {
-	rowtpl := "|  %s"
+	var (
+		dif    = t.lenkey - len(key)
+		rowtpl = "|  %s"
+	)
 
-	padding := t.lenkey - len(key)
-
-	if padding > 0 {
-		for i := 0; i < padding; i++ {
+	if dif > 0 {
+		for i := 0; i < dif; i++ {
 			rowtpl += " "
 		}
 	}
 	rowtpl += "  |  %.2f"
 
-	padding = t.lenval - (len(strconv.Itoa(int(val))) + 3)
-	if padding > 0 {
-		for i := 0; i < padding; i++ {
+	if dif = t.lenval - (len(strconv.Itoa(int(val))) + 3); dif > 0 {
+		for i := 0; i < dif; i++ {
 			rowtpl += " "
 		}
 	}
@@ -102,23 +103,24 @@ func (t *Table) printRow(key string, val float64) {
 }
 
 func (t *Table) printTitle() {
-	padding := (len(t.sep) - 4) - len(t.title)
+	var (
+		dif    = (len(t.sep) - t.padding*2) - len(t.title)
+		rowtpl = "|  %s"
+	)
 
-	rowtpl := "|  %s"
-	if padding > 0 {
-		for i := 0; i < padding; i++ {
+	if dif > 0 {
+		for i := 0; i < dif; i++ {
 			rowtpl += " "
 		}
-	} else if padding < 0 {
-		padding = -padding + 2
+	} else if dif < 0 {
 		// title is larger than the rows,
-		// add padding to cells
-		t.lenval += padding / 2
-		t.lenkey += padding / 2
+		// add dif to cells
+		t.lenval += -dif / 2
+		t.lenkey += -dif / 2
 
 		t.computeRowSep()
 	}
-	rowtpl += "  |\n"
+	rowtpl += "|\n"
 
 	t.printSep()
 	fmt.Printf(rowtpl, t.title)
