@@ -17,7 +17,7 @@ type Table struct {
 	// title of the table
 	title string
 	// len of the largest key and value ( stringlen )
-	// of the Data map.
+	// of the rows.
 	// Used to build rows with proper alignment
 	lenkey, lenval     int
 	padding, titlediff int
@@ -57,8 +57,8 @@ func (t *Table) SetTitle(title string) {
 	t.title = title
 }
 
-func (t *Table) IsSingle() {
-	t.isSingle = true
+func (t *Table) SetSingle(s bool) {
+	t.isSingle = s
 }
 
 func (t *Table) computeRowSep() {
@@ -75,7 +75,6 @@ func (t *Table) computeRowSep() {
 
 	if len(t.title) > 0 {
 		var rowlen int
-
 		if t.isSingle {
 			rowlen = t.lenkey
 		} else {
@@ -83,12 +82,13 @@ func (t *Table) computeRowSep() {
 		}
 
 		if t.titlediff = rowlen - len(t.title); t.titlediff < 0 {
+			// title is larger than the largest row content,
+			// add diff to cells
 			if t.isSingle {
 				t.lenkey -= t.titlediff
 			} else {
 				complet := -t.titlediff / 2
-				// title is larger than the rows,
-				// add diff to cells
+
 				t.lenval += complet
 				t.lenkey += complet
 

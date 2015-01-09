@@ -40,7 +40,7 @@ func main() {
 
 				table := NewTable()
 				table.SetTitle("TRACKERS LIST")
-				table.IsSingle()
+				table.SetSingle(true)
 
 				for _, tracker := range trackers {
 					table.Append(tracker, 0)
@@ -140,7 +140,7 @@ func main() {
 						}
 						table := NewTable()
 						table.SetTitle("CATEGORIES")
-						table.IsSingle()
+						table.SetSingle(true)
 
 						for k, v := range categories {
 							table.Append(v, float64(k))
