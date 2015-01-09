@@ -49,7 +49,7 @@ func (db *DB) queryWeek(occurence, category int) ([]dataPrinter, error) {
 		year, week = computeLimitWeek(year, week, occurence)
 
 		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
-			"select sum(qty), isoyear, isoweek from records "+
+			"select sum(qty) as quantity, isoyear, isoweek from records "+
 			"where (isoyear >= %d and isoweek >= %d) "+
 			"or isoyear > %d %sgroup by isoweek) where quantity is not null", year, week, year, condition)
 	}
