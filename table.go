@@ -48,10 +48,10 @@ func (t *Table) SetTitle(title string) {
 
 func (t *Table) computeRowSep() {
 	for k, v := range t.Data {
-		if len(k) > t.lenkey {
-			t.lenkey = len(k)
+		if lenkey := len(k); lenkey > t.lenkey {
+			t.lenkey = lenkey
 		}
-		if lenval := len(strconv.Itoa(int(v))) + 3; lenval > t.lenval {
+		if lenval := len(strconv.FormatFloat(v, 'f', 2, 64)); lenval > t.lenval {
 			t.lenval = lenval
 		}
 	}
@@ -72,10 +72,6 @@ func (t *Table) computeRowSep() {
 		t.sep += "-"
 	}
 	t.sep += "+"
-}
-
-func (t *Table) printSep() {
-	fmt.Println(t.sep)
 }
 
 func (t *Table) printRow(key string, val float64) {
@@ -124,4 +120,8 @@ func (t *Table) printTitle() {
 
 	t.printSep()
 	fmt.Printf(rowtpl, t.title)
+}
+
+func (t *Table) printSep() {
+	fmt.Println(t.sep)
 }
