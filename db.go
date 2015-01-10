@@ -131,7 +131,7 @@ func (db *DB) queryYear(occurence, category int) ([]dataFormatter, error) {
 	} else {
 		year = year - occurence
 
-		query = fmt.Sprintf("select quantity, isoyear from("+
+		query = fmt.Sprintf("select quantity, isoyear from ("+
 			"select sum(qty) as quantity, isoyear from records "+
 			"where isoyear >= %d %sgroup by isoyear) where quantity is not null", year, condition)
 	}

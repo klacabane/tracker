@@ -2,164 +2,100 @@ package main
 
 import (
 	"fmt"
-	"strconv"
-)
-
-const (
-	TPL_HEAD = "|  %s"
-	TPL_TAIL = "  |\n"
 )
 
 type Table struct {
-	rows []row
-	// row separator
-	sep string
-	// title of the table
-	title string
-	// len of the largest key and value ( stringlen )
-	// of the rows.
-	// Used to build rows with proper alignment
-	lenkey, lenval     int
-	padding, titlediff int
+	Columns []string
+	Padding int
 
-	isSingle bool
+	rows      [][]string
+	separator string
+	title     string
+
+	columnsSize map[int]int
 }
 
-type row struct {
-	key   string
-	value float64
-}
-
-func NewTable() *Table {
-	return &Table{
-		rows:    make([]row, 0),
-		padding: 2,
+func NewTable(cols ...string) *Table {
+	t := &Table{
+		rows:        make([][]string, 0),
+		Columns:     cols,
+		columnsSize: make(map[int]int),
+		Padding:     2,
 	}
+
+	for i := 0; i < len(cols); i++ {
+		t.columnsSize[i] = len(cols[i])
+	}
+	return t
 }
 
 func (t *Table) Print() {
-	t.computeRowSep()
+	t.computeSeparator()
 
-	if len(t.title) > 0 {
-		t.printSep()
-		t.printTitle()
-	}
-	t.printSep()
-
-	for _, row := range t.rows {
-		t.printRow(row)
-		t.printSep()
+	t.printSeparator()
+	t.printRow(t.Columns)
+	t.printSeparator()
+	for i := 0; i < len(t.rows); i++ {
+		t.printRow(t.rows[i])
+		t.printSeparator()
 	}
 }
 
-func (t *Table) Append(key string, value float64) {
-	t.rows = append(t.rows, row{key, value})
-}
+func (t *Table) Add(row ...interface{}) {
+	if len(row) == 0 || len(row) != len(t.Columns) {
+		fmt.Println("invalid row len")
+		return
+	}
 
-func (t *Table) SetTitle(title string) {
-	t.title = title
-}
+	r := make([]string, len(t.Columns))
+	for i := 0; i < len(t.Columns); i++ {
+		val := fmt.Sprintf("%v", row[i])
 
-func (t *Table) SetSingle(s bool) {
-	t.isSingle = s
-}
-
-func (t *Table) computeRowSep() {
-	for _, row := range t.rows {
-		if lenkey := len(row.key); lenkey > t.lenkey {
-			t.lenkey = lenkey
+		if len(val) > t.columnsSize[i] {
+			t.columnsSize[i] = len(val)
 		}
-		if !t.isSingle {
-			if lenval := len(strconv.FormatFloat(row.value, 'f', 2, 64)); lenval > t.lenval {
-				t.lenval = lenval
+		r[i] = val
+	}
+	t.rows = append(t.rows, r)
+}
+
+func (t *Table) computeSeparator() {
+	t.separator = "+"
+
+	for i := 0; i < len(t.columnsSize); i++ {
+		colsize := t.columnsSize[i] + t.Padding*2
+		for j := 0; j < colsize; j++ {
+			t.separator += "-"
+		}
+		t.separator += "+"
+	}
+}
+
+func (t *Table) printRow(row []string) {
+	tpl := "|"
+	for i := 0; i < len(row); i++ {
+		val := row[i]
+
+		for j := 0; j < t.Padding; j++ {
+			tpl += " "
+		}
+		tpl += val
+
+		if diff := t.columnsSize[i] - len(val); diff > 0 {
+			for j := 0; j < diff; j++ {
+				tpl += " "
 			}
 		}
-	}
 
-	if len(t.title) > 0 {
-		var rowlen int
-		if t.isSingle {
-			rowlen = t.lenkey
-		} else {
-			rowlen = t.lenkey + (2 * t.padding) + 1 + t.lenval
+		for j := 0; j < t.Padding; j++ {
+			tpl += " "
 		}
-
-		if t.titlediff = rowlen - len(t.title); t.titlediff < 0 {
-			// title is larger than the largest row content,
-			// add diff to cells
-			if t.isSingle {
-				t.lenkey -= t.titlediff
-			} else {
-				complet := -t.titlediff / 2
-
-				t.lenval += complet
-				t.lenkey += complet
-
-				if -t.titlediff%2 > 0 {
-					t.lenkey++
-				}
-			}
-			t.titlediff = 0
-		}
+		tpl += "|"
 	}
 
-	t.sep = "+"
-	for i, j := 0, t.lenkey+t.padding*2; i < j; i++ {
-		t.sep += "-"
-	}
-	t.sep += "+"
-
-	if !t.isSingle {
-		for i, j := 0, t.lenval+t.padding*2; i < j; i++ {
-			t.sep += "-"
-		}
-		t.sep += "+"
-	}
+	fmt.Println(tpl)
 }
 
-func (t *Table) printRow(r row) {
-	var (
-		diff   = t.lenkey - len(r.key)
-		rowtpl = TPL_HEAD
-	)
-
-	if diff > 0 {
-		for i := 0; i < diff; i++ {
-			rowtpl += " "
-		}
-	}
-
-	if !t.isSingle {
-		rowtpl += "  |  %.2f"
-
-		if diff = t.lenval - len(strconv.FormatFloat(r.value, 'f', 2, 64)); diff > 0 {
-			for i := 0; i < diff; i++ {
-				rowtpl += " "
-			}
-		}
-	}
-	rowtpl += TPL_TAIL
-
-	if t.isSingle {
-		fmt.Printf(rowtpl, r.key)
-	} else {
-		fmt.Printf(rowtpl, r.key, r.value)
-	}
-}
-
-func (t *Table) printTitle() {
-	var rowtpl = TPL_HEAD
-
-	if t.titlediff > 0 {
-		for i := 0; i < t.titlediff; i++ {
-			rowtpl += " "
-		}
-	}
-	rowtpl += TPL_TAIL
-
-	fmt.Printf(rowtpl, t.title)
-}
-
-func (t *Table) printSep() {
-	fmt.Println(t.sep)
+func (t *Table) printSeparator() {
+	fmt.Println(t.separator)
 }

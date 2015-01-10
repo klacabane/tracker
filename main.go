@@ -38,12 +38,10 @@ func main() {
 					return
 				}
 
-				table := NewTable()
-				table.SetTitle("TRACKERS LIST")
-				table.SetSingle(true)
-
+				table := NewTable("TRACKERS LIST")
 				for _, tracker := range trackers {
-					table.Append(tracker, 0)
+					table.Add(tracker)
+
 				}
 				table.Print()
 			},
@@ -138,12 +136,9 @@ func main() {
 							fmt.Println(err)
 							return
 						}
-						table := NewTable()
-						table.SetTitle("CATEGORIES")
-						table.SetSingle(true)
-
+						table := NewTable("CATEGORIES", "")
 						for k, v := range categories {
-							table.Append(fmt.Sprintf("%d %s", k, v), 0)
+							table.Add(k, v)
 						}
 						table.Print()
 					},
@@ -195,12 +190,12 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
-					table = NewTable()
-
 					period    = c.String("period")
 					occurence = c.Int("occurence")
 					category  = c.Int("category")
 					trackers  = c.StringSlice("t")
+
+					table = NewTable(strings.ToUpper(period), "")
 				)
 
 				if period != "w" && period != "m" && period != "y" {
@@ -277,18 +272,23 @@ func main() {
 					}
 
 					if len(res.title) > 0 {
-						table.SetTitle(strings.ToUpper(res.title))
+						table.Columns[0] = strings.ToUpper(res.title)
 					}
 				}
 
 				var total float64
 				for k, v := range rows {
 					total += v
-					table.Append(k, v)
+					table.Add(k, v)
 				}
-				table.Append("Total", total)
+				table.Add("Total", total)
 
 				table.Print()
+			},
+		},
+		{
+			Name: "graph",
+			Action: func(c *cli.Context) {
 			},
 		},
 	}
