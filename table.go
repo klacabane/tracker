@@ -5,10 +5,10 @@ import (
 )
 
 type Table struct {
-	Columns []string
 	Padding int
 
 	rows      [][]string
+	columns   []string
 	separator string
 	title     string
 
@@ -18,13 +18,13 @@ type Table struct {
 func NewTable(cols ...string) *Table {
 	t := &Table{
 		rows:        make([][]string, 0),
-		Columns:     cols,
+		columns:     cols,
 		columnsSize: make(map[int]int),
 		Padding:     2,
 	}
 
-	for i := 0; i < len(cols); i++ {
-		t.columnsSize[i] = len(cols[i])
+	for i, col := range cols {
+		t.columnsSize[i] = len(col)
 	}
 	return t
 }
@@ -33,22 +33,27 @@ func (t *Table) Print() {
 	t.computeSeparator()
 
 	t.printSeparator()
-	t.printRow(t.Columns)
+	t.printRow(t.columns)
 	t.printSeparator()
-	for i := 0; i < len(t.rows); i++ {
-		t.printRow(t.rows[i])
+	for _, row := range t.rows {
+		t.printRow(row)
 		t.printSeparator()
 	}
 }
 
 func (t *Table) Add(row ...interface{}) {
-	if len(row) == 0 || len(row) != len(t.Columns) {
+	var (
+		lenrow  = len(row)
+		lencols = len(t.columns)
+	)
+
+	if lenrow == 0 || lenrow > lencols {
 		fmt.Println("invalid row len")
 		return
 	}
 
-	r := make([]string, len(t.Columns))
-	for i := 0; i < len(t.Columns); i++ {
+	r := make([]string, lencols)
+	for i := 0; i < lenrow; i++ {
 		val := fmt.Sprintf("%v", row[i])
 
 		if len(val) > t.columnsSize[i] {
@@ -59,12 +64,24 @@ func (t *Table) Add(row ...interface{}) {
 	t.rows = append(t.rows, r)
 }
 
+func (t *Table) SetColumn(index int, value string) {
+	size, ok := t.columnsSize[index]
+	if !ok {
+		return
+	}
+
+	t.columns[index] = value
+	if lencol := len(value); lencol > size {
+		t.columnsSize[index] = lencol
+	}
+}
+
 func (t *Table) computeSeparator() {
 	t.separator = "+"
 
-	for i := 0; i < len(t.columnsSize); i++ {
-		colsize := t.columnsSize[i] + t.Padding*2
-		for j := 0; j < colsize; j++ {
+	for _, size := range t.columnsSize {
+		fullsize := size + t.Padding*2
+		for j := 0; j < fullsize; j++ {
 			t.separator += "-"
 		}
 		t.separator += "+"
@@ -73,15 +90,13 @@ func (t *Table) computeSeparator() {
 
 func (t *Table) printRow(row []string) {
 	tpl := "|"
-	for i := 0; i < len(row); i++ {
-		val := row[i]
-
+	for i, field := range row {
 		for j := 0; j < t.Padding; j++ {
 			tpl += " "
 		}
-		tpl += val
+		tpl += field
 
-		if diff := t.columnsSize[i] - len(val); diff > 0 {
+		if diff := t.columnsSize[i] - len(field); diff > 0 {
 			for j := 0; j < diff; j++ {
 				tpl += " "
 			}

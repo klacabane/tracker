@@ -272,7 +272,7 @@ func main() {
 					}
 
 					if len(res.title) > 0 {
-						table.Columns[0] = strings.ToUpper(res.title)
+						table.SetColumn(0, strings.ToUpper(res.title))
 					}
 				}
 
