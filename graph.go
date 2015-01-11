@@ -13,6 +13,7 @@ var (
 type Graph struct {
 	height, width int
 
+	labels      []string
 	values      []float64
 	x           map[int]string
 	y           map[int]float64
@@ -26,8 +27,9 @@ type coord struct {
 	y int
 }
 
-func NewGraph(points map[string]float64) *Graph {
+func NewGraph(labels []string, points map[string]float64) *Graph {
 	g := &Graph{
+		labels:      labels,
 		values:      make([]float64, 0),
 		x:           make(map[int]string),
 		y:           make(map[int]float64),
@@ -128,7 +130,7 @@ func (g *Graph) compute() {
 
 	// ordinate
 	current := g.paddingLeft + 1 + labelMargin
-	for label, _ := range g.points {
+	for _, label := range g.labels {
 		g.x[current] = label
 		current += len(label) + labelMargin
 	}

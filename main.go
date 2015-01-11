@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"sort"
 	"strings"
 	"time"
 
@@ -291,14 +292,25 @@ func main() {
 		{
 			Name: "graph",
 			Action: func(c *cli.Context) {
-				g := NewGraph(map[string]float64{
-					"2015-01": 100,
-					"2015-02": 50,
-					"2015-03": 22.2,
-					"2015-04": 1012,
-					"2015-05": 744,
-					"2015-06": 22.2,
-				})
+				res := result{
+					values: []dataFormatter{
+						weekData{22, 2014, 15},
+						weekData{52, 2015, 1},
+						weekData{200, 2012, 51},
+					},
+				}
+				sort.Sort(res)
+
+				var (
+					points = make(map[string]float64)
+					labels = make([]string, len(res.values))
+				)
+				for i, data := range res.values {
+					labels[i] = data.key()
+					points[data.key()] = data.sum()
+				}
+
+				g := NewGraph(labels, points)
 				g.Print()
 			},
 		},
