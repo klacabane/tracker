@@ -195,12 +195,14 @@ func main() {
 					category  = c.Int("category")
 					trackers  = c.StringSlice("t")
 
-					table = NewTable(strings.ToUpper(period), "")
+					table = NewTable("", "")
 				)
 
-				if period != "w" && period != "m" && period != "y" {
-					fmt.Println("invalid period flag.")
+				if label, err := periodLabel(period); err != nil {
+					fmt.Println(err)
 					return
+				} else {
+					table.SetColumn(0, label)
 				}
 
 				if len(trackers) == 1 && trackers[0] == "all" {
@@ -289,6 +291,15 @@ func main() {
 		{
 			Name: "graph",
 			Action: func(c *cli.Context) {
+				g := NewGraph(map[string]float64{
+					"2015-01": 100,
+					"2015-02": 50,
+					"2015-03": 22.2,
+					"2015-04": 1012,
+					"2015-05": 744,
+					"2015-06": 22.2,
+				})
+				g.Print()
 			},
 		},
 	}
@@ -333,4 +344,17 @@ func isLongYear(year int) bool {
 	)
 	return (isLeap && (start.Weekday() == time.Wednesday || end.Weekday() == time.Friday)) ||
 		(!isLeap && (start.Weekday() == time.Thursday || end.Weekday() == time.Friday))
+}
+
+func periodLabel(p string) (string, error) {
+	switch p {
+	case "w":
+		return "WEEK", nil
+	case "m":
+		return "MONTH", nil
+	case "y":
+		return "YEAR", nil
+	default:
+		return "", fmt.Errorf("invalid period flag.")
+	}
 }
