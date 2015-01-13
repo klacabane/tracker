@@ -12,7 +12,6 @@ type dataFormatter interface {
 
 type result struct {
 	values []dataFormatter
-	title  string
 	err    error
 }
 

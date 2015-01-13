@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/user"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/codegangsta/cli"
@@ -39,7 +38,8 @@ func main() {
 					return
 				}
 
-				table := NewTable("TRACKERS LIST")
+				table := NewTable(1)
+				table.Title = "TRACKERS"
 				for _, tracker := range trackers {
 					table.Add(tracker)
 
@@ -138,7 +138,8 @@ func main() {
 							return
 						}
 
-						table := NewTable("CATEGORIES", "")
+						table := NewTable(2)
+						table.Title = "CATEGORIES"
 						for k, v := range categories {
 							table.Add(k, v)
 						}
@@ -215,13 +216,17 @@ func main() {
 
 				go keys(period, occurence, chkeys)
 
-				if len(trackers) == 1 && trackers[0] == "all" {
-					var err error
+				if len(trackers) == 1 {
+					if trackers[0] == "all" {
+						var err error
 
-					trackers, err = dblist()
-					if err != nil {
-						fmt.Println(err)
-						return
+						trackers, err = dblist()
+						if err != nil {
+							fmt.Println(err)
+							return
+						}
+					} else {
+						title = trackers[0]
 					}
 				}
 
@@ -251,11 +256,13 @@ func main() {
 						defer db.Close()
 
 						if category > 0 {
-							title, res.err = db.getCategory(category)
-							if res.err != nil {
+							name, err := db.getCategory(category)
+							if err != nil {
+								res.err = err
 								chres <- res
 								return
 							}
+							title += " " + name
 						}
 
 						switch period {
@@ -275,7 +282,7 @@ func main() {
 					total float64
 
 					rows  = make(map[string]float64)
-					table = NewTable("", "")
+					table = NewTable(2)
 				)
 				for i := 0; i < len(trackers); i++ {
 					res := <-chres
@@ -297,7 +304,7 @@ func main() {
 					table.Add(k, sum)
 				}
 				table.Add("Total", total)
-				table.SetColumn(0, strings.ToUpper(title))
+				table.Title = title
 
 				table.Print()
 			},
