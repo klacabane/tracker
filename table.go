@@ -36,14 +36,14 @@ func NewTableNamedCols(cols ...string) *Table {
 	return t
 }
 
-func NewTable(colNb int) *Table {
+func NewTable(colNb uint) *Table {
 	t := &Table{
 		rows:    make([][]string, 0),
 		columns: make([]*column, colNb),
 		Padding: 2,
 	}
 
-	for i := 0; i < colNb; i++ {
+	for i := uint(0); i < colNb; i++ {
 		t.columns[i] = &column{}
 	}
 	return t
@@ -57,7 +57,7 @@ func (t *Table) Print() {
 	}
 	t.printSeparator()
 
-	if t.showColums() {
+	if t.showColumNames() {
 		t.printRow(t.columnNames())
 		t.printSeparator()
 	}
@@ -103,7 +103,7 @@ func (t *Table) SetColumn(index int, value string) {
 	}
 }
 
-func (t *Table) showColums() bool {
+func (t *Table) showColumNames() bool {
 	for _, col := range t.columns {
 		if len(col.name) > 0 {
 			return true
@@ -119,50 +119,54 @@ func (t *Table) columnNames() (names []string) {
 	return
 }
 
-func (t *Table) adjustTitleWidth() {
-	if titleWidth := len(t.Title); titleWidth > 0 {
-		var contentWidth int
+func (t *Table) adjustTitleDiff() {
+	var (
+		contentWidth int
 
-		if len(t.columns) == 1 {
-			contentWidth = t.columns[0].width
-		} else {
-			first, last, border := 0, len(t.columns)-1, 1
-			for i, col := range t.columns {
-				if i == first {
-					contentWidth += col.width + t.Padding + border
-				} else if i == last {
-					contentWidth += col.width + t.Padding
-				} else {
-					contentWidth += col.width + t.Padding*2 + border
-				}
+		titleWidth = len(t.Title)
+		colNb      = len(t.columns)
+	)
+
+	if colNb == 1 {
+		contentWidth = t.columns[0].width
+	} else {
+		first, last, border := 0, colNb-1, 1
+		for i, col := range t.columns {
+			if i == first {
+				contentWidth += col.width + t.Padding + border
+			} else if i == last {
+				contentWidth += col.width + t.Padding
+			} else {
+				contentWidth += col.width + t.Padding*2 + border
 			}
 		}
+	}
 
-		if diff := titleWidth - contentWidth; diff > 0 {
-			chunk := diff / len(t.columns)
+	if diff := titleWidth - contentWidth; diff > 0 {
+		chunk := diff / colNb
 
-			for _, col := range t.columns {
-				col.width += chunk
-			}
-
-			if diff%2 > 0 {
-				t.columns[0].width++
-			}
-		} else {
-			t.titleDiff = -diff
+		for _, col := range t.columns {
+			col.width += chunk
 		}
+
+		if diff%2 > 0 {
+			t.columns[0].width++
+		}
+	} else {
+		t.titleDiff = -diff
 	}
 }
 
 func (t *Table) computeSeparator() {
-	t.adjustTitleWidth()
+	if len(t.Title) > 0 {
+		t.adjustTitleDiff()
+	}
 	t.separator = "+"
 
 	for _, col := range t.columns {
 		fullWidth := col.width + t.Padding*2
-		for j := 0; j < fullWidth; j++ {
-			t.separator += "-"
-		}
+
+		t.separator += strings.Repeat("-", fullWidth)
 		t.separator += "+"
 	}
 }
@@ -170,20 +174,14 @@ func (t *Table) computeSeparator() {
 func (t *Table) printRow(row []string) {
 	tpl := "|"
 	for i, field := range row {
-		for j := 0; j < t.Padding; j++ {
-			tpl += " "
-		}
+		tpl += strings.Repeat(" ", t.Padding)
 		tpl += field
 
 		if diff := t.columns[i].width - len(field); diff > 0 {
-			for j := 0; j < diff; j++ {
-				tpl += " "
-			}
+			tpl += strings.Repeat(" ", diff)
 		}
 
-		for j := 0; j < t.Padding; j++ {
-			tpl += " "
-		}
+		tpl += strings.Repeat(" ", t.Padding)
 		tpl += "|"
 	}
 
@@ -194,18 +192,14 @@ func (t *Table) printTitle() {
 	separator := strings.Replace(t.separator[1:len(t.separator)-1], "+", "-", -1)
 	separator = "+" + separator + "+"
 
+	diff := t.Padding + t.titleDiff
+
 	fmt.Println(separator)
 
 	tpl := "|"
-	for i := 0; i < t.Padding; i++ {
-		tpl += " "
-	}
+	tpl += strings.Repeat(" ", t.Padding)
 	tpl += strings.ToUpper(t.Title)
-
-	diff := t.Padding + t.titleDiff
-	for i := 0; i < diff; i++ {
-		tpl += " "
-	}
+	tpl += strings.Repeat(" ", diff)
 	tpl += "|"
 
 	fmt.Println(tpl)
