@@ -35,7 +35,7 @@ func (db *DB) queryWeek(occurence, category int) ([]dataFormatter, error) {
 		query string
 	)
 
-	if occurence <= 0 {
+	if occurence == 0 {
 		// query concerns current week
 		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
 			"select sum(qty) as quantity, isoyear, isoweek from records "+
@@ -46,8 +46,8 @@ func (db *DB) queryWeek(occurence, category int) ([]dataFormatter, error) {
 
 		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
 			"select sum(qty) as quantity, isoyear, isoweek from records "+
-			"where (isoyear >= %d and isoweek >= %d) "+
-			"or isoyear > %d %sgroup by isoweek) where quantity is not null", year, week, year, condition)
+			"where ((isoyear >= %d and isoweek >= %d) "+
+			"or isoyear > %d) %sgroup by isoweek) where quantity is not null", year, week, year, condition)
 	}
 
 	rows, err := db.Query(query)
@@ -78,7 +78,7 @@ func (db *DB) queryMonth(occurence, category int) ([]dataFormatter, error) {
 		query string
 	)
 
-	if occurence <= 0 {
+	if occurence == 0 {
 		query = "select quantity, isoyear, month from (" +
 			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
 			"from records where strftime('%m', date) = " + fmt.Sprintf("'%s' ", monthVal(int(month))) +
@@ -124,7 +124,7 @@ func (db *DB) queryYear(occurence, category int) ([]dataFormatter, error) {
 		query string
 	)
 
-	if occurence <= 0 {
+	if occurence == 0 {
 		query = fmt.Sprintf("select quantity, isoyear from ("+
 			"select sum(qty) as quantity, isoyear from records "+
 			"where isoyear = %d %s) where quantity is not null", year, condition)

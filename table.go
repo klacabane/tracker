@@ -7,24 +7,29 @@ import (
 type Table struct {
 	Padding int
 
-	rows      [][]string
-	columns   []string
+	rows    [][]string
+	columns []*column
+
 	separator string
 	title     string
+}
 
-	columnsSize map[int]int
+type column struct {
+	name  string
+	width int
 }
 
 func NewTable(cols ...string) *Table {
 	t := &Table{
-		rows:        make([][]string, 0),
-		columns:     cols,
-		columnsSize: make(map[int]int),
-		Padding:     2,
+		rows:    make([][]string, 0),
+		columns: make([]*column, len(cols)),
+		Padding: 2,
 	}
 
 	for i, col := range cols {
-		t.columnsSize[i] = len(col)
+		c := &column{col, len(col)}
+
+		t.columns[i] = c
 	}
 	return t
 }
@@ -33,7 +38,7 @@ func (t *Table) Print() {
 	t.computeSeparator()
 
 	t.printSeparator()
-	t.printRow(t.columns)
+	t.printRow(t.columnNames())
 	t.printSeparator()
 	for _, row := range t.rows {
 		t.printRow(row)
@@ -56,8 +61,8 @@ func (t *Table) Add(row ...interface{}) {
 	for i := 0; i < lenrow; i++ {
 		val := fmt.Sprintf("%v", row[i])
 
-		if len(val) > t.columnsSize[i] {
-			t.columnsSize[i] = len(val)
+		if width := len(val); width > t.columns[i].width {
+			t.columns[i].width = width
 		}
 		r[i] = val
 	}
@@ -65,22 +70,30 @@ func (t *Table) Add(row ...interface{}) {
 }
 
 func (t *Table) SetColumn(index int, value string) {
-	size, ok := t.columnsSize[index]
-	if !ok {
+	if index > len(t.columns)-1 {
 		return
 	}
 
-	t.columns[index] = value
-	if lencol := len(value); lencol > size {
-		t.columnsSize[index] = lencol
+	col := t.columns[index]
+
+	col.name = value
+	if width := len(value); width > col.width {
+		col.width = width
 	}
+}
+
+func (t *Table) columnNames() (names []string) {
+	for _, col := range t.columns {
+		names = append(names, col.name)
+	}
+	return
 }
 
 func (t *Table) computeSeparator() {
 	t.separator = "+"
 
-	for _, size := range t.columnsSize {
-		fullsize := size + t.Padding*2
+	for _, col := range t.columns {
+		fullsize := col.width + t.Padding*2
 		for j := 0; j < fullsize; j++ {
 			t.separator += "-"
 		}
@@ -96,7 +109,7 @@ func (t *Table) printRow(row []string) {
 		}
 		tpl += field
 
-		if diff := t.columnsSize[i] - len(field); diff > 0 {
+		if diff := t.columns[i].width - len(field); diff > 0 {
 			for j := 0; j < diff; j++ {
 				tpl += " "
 			}

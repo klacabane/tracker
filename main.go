@@ -137,6 +137,7 @@ func main() {
 							fmt.Println(err)
 							return
 						}
+
 						table := NewTable("CATEGORIES", "")
 						for k, v := range categories {
 							table.Add(k, v)
@@ -147,7 +148,10 @@ func main() {
 				{
 					Name: "add",
 					Action: func(c *cli.Context) {
-						if len(c.Args()) <= 1 {
+						if length := len(c.Args()); length == 0 {
+							fmt.Println(ErrNoName)
+							return
+						} else if length == 1 {
 							fmt.Println("no categories specified.")
 							return
 						}
@@ -196,15 +200,20 @@ func main() {
 					category  = c.Int("category")
 					trackers  = c.StringSlice("t")
 
-					table = NewTable("", "")
+					chkeys = make(chan []string, 1)
 				)
 
-				if label, err := periodLabel(period); err != nil {
+				if occurence < 0 {
+					occurence = 0
+				}
+
+				title, err := periodLabel(period)
+				if err != nil {
 					fmt.Println(err)
 					return
-				} else {
-					table.SetColumn(0, label)
 				}
+
+				go keys(period, occurence, chkeys)
 
 				if len(trackers) == 1 && trackers[0] == "all" {
 					var err error
@@ -221,7 +230,7 @@ func main() {
 					fmt.Println("ignoring category flag.")
 				}
 
-				ch := make(chan result, len(trackers))
+				chres := make(chan result, len(trackers))
 				for _, tracker := range trackers {
 					go func(dbname string) {
 						var res result
@@ -229,22 +238,22 @@ func main() {
 						p := dbpath(dbname)
 						if !exists(p) {
 							res.err = ErrInvalidDB
-							ch <- res
+							chres <- res
 							return
 						}
 
 						db, err := open(p)
 						if err != nil {
 							res.err = err
-							ch <- res
+							chres <- res
 							return
 						}
 						defer db.Close()
 
-						if category != 0 {
-							res.title, res.err = db.getCategory(category)
+						if category > 0 {
+							title, res.err = db.getCategory(category)
 							if res.err != nil {
-								ch <- res
+								chres <- res
 								return
 							}
 						}
@@ -258,33 +267,37 @@ func main() {
 							res.values, res.err = db.queryYear(occurence, category)
 						}
 
-						ch <- res
+						chres <- res
 					}(tracker)
 				}
 
-				var rows = make(map[string]float64)
+				var (
+					total float64
+
+					rows  = make(map[string]float64)
+					table = NewTable("", "")
+				)
 				for i := 0; i < len(trackers); i++ {
-					res := <-ch
+					res := <-chres
 					if res.err != nil {
 						fmt.Println(res.err)
-						continue
+						return
 					}
 
 					for _, data := range res.values {
 						rows[data.key()] += data.sum()
 					}
 
-					if len(res.title) > 0 {
-						table.SetColumn(0, strings.ToUpper(res.title))
-					}
 				}
 
-				var total float64
-				for k, v := range rows {
-					total += v
-					table.Add(k, v)
+				for _, k := range <-chkeys {
+					sum := rows[k]
+
+					total += sum
+					table.Add(k, sum)
 				}
 				table.Add("Total", total)
+				table.SetColumn(0, strings.ToUpper(title))
 
 				table.Print()
 			},
@@ -347,6 +360,66 @@ func computeLimitWeek(year, week, n int) (int, int) {
 	return year, week
 }
 
+func keys(p string, n int, c chan<- []string) {
+	if p == "w" {
+		c <- weekKeys(n)
+	} else if p == "m" {
+		c <- monthKeys(n)
+	} else {
+		c <- yearKeys(n)
+	}
+}
+
+func weekKeys(n int) []string {
+	var (
+		keys       = make([]string, n+1)
+		year, week = time.Now().ISOWeek()
+
+		wd = weekData{0, year, week}
+	)
+
+	for n >= 0 {
+		keys[n] = wd.key()
+		wd.year, wd.week = computeLimitWeek(wd.year, wd.week, 1)
+
+		n--
+	}
+	return keys
+}
+
+func monthKeys(n int) []string {
+	var (
+		keys = make([]string, n+1)
+		date = time.Now()
+
+		md = monthData{0, date.Year(), int(date.Month())}
+	)
+
+	for n >= 0 {
+		keys[n] = md.key()
+		md.year, md.month = computeLimitMonth(md.year, md.month, 1)
+
+		n--
+	}
+	return keys
+}
+
+func yearKeys(n int) []string {
+	var (
+		keys = make([]string, n+1)
+
+		yd = yearData{0, time.Now().Year()}
+	)
+
+	for n >= 0 {
+		keys[n] = yd.key()
+		yd.year--
+
+		n--
+	}
+	return keys
+}
+
 func isLongYear(year int) bool {
 	var (
 		start = time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
@@ -361,11 +434,11 @@ func isLongYear(year int) bool {
 func periodLabel(p string) (string, error) {
 	switch p {
 	case "w":
-		return "WEEK", nil
+		return "week", nil
 	case "m":
-		return "MONTH", nil
+		return "month", nil
 	case "y":
-		return "YEAR", nil
+		return "year", nil
 	default:
 		return "", fmt.Errorf("invalid period flag.")
 	}
