@@ -29,9 +29,7 @@ func NewTableNamedCols(cols ...string) *Table {
 	}
 
 	for i, col := range cols {
-		c := &column{col, len(col)}
-
-		t.columns[i] = c
+		t.columns[i] = &column{col, len(col)}
 	}
 	return t
 }
@@ -61,6 +59,7 @@ func (t *Table) Print() {
 		t.printRow(t.columnNames())
 		t.printSeparator()
 	}
+
 	for _, row := range t.rows {
 		t.printRow(row)
 		t.printSeparator()
@@ -142,7 +141,9 @@ func (t *Table) adjustTitleDiff() {
 		}
 	}
 
-	if diff := titleWidth - contentWidth; diff > 0 {
+	if diff := titleWidth - contentWidth; diff <= 0 {
+		t.titleDiff = -diff
+	} else {
 		chunk := diff / colNb
 
 		for _, col := range t.columns {
@@ -152,8 +153,6 @@ func (t *Table) adjustTitleDiff() {
 		if diff%2 > 0 {
 			t.columns[0].width++
 		}
-	} else {
-		t.titleDiff = -diff
 	}
 }
 
@@ -161,8 +160,8 @@ func (t *Table) computeSeparator() {
 	if len(t.Title) > 0 {
 		t.adjustTitleDiff()
 	}
-	t.separator = "+"
 
+	t.separator = "+"
 	for _, col := range t.columns {
 		fullWidth := col.width + t.Padding*2
 
@@ -194,14 +193,13 @@ func (t *Table) printTitle() {
 
 	diff := t.Padding + t.titleDiff
 
-	fmt.Println(separator)
-
 	tpl := "|"
 	tpl += strings.Repeat(" ", t.Padding)
 	tpl += strings.ToUpper(t.Title)
 	tpl += strings.Repeat(" ", diff)
 	tpl += "|"
 
+	fmt.Println(separator)
 	fmt.Println(tpl)
 }
 
