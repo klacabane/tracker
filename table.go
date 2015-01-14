@@ -21,27 +21,32 @@ type column struct {
 	width int
 }
 
-func NewTableNamedCols(cols ...string) *Table {
+func NewTableNamedCols(col string, cols ...string) *Table {
 	t := &Table{
 		rows:    make([][]string, 0),
-		columns: make([]*column, len(cols)),
+		columns: make([]*column, len(cols)+1),
 		Padding: 2,
 	}
 
-	for i, col := range cols {
-		t.columns[i] = &column{col, len(col)}
+	t.columns[0] = &column{col, len(col)}
+	for i, c := range cols {
+		t.columns[i+1] = &column{c, len(c)}
 	}
 	return t
 }
 
-func NewTable(colNb uint) *Table {
+func NewTable(colNb int) *Table {
+	if colNb <= 0 {
+		colNb = 1
+	}
+
 	t := &Table{
 		rows:    make([][]string, 0),
 		columns: make([]*column, colNb),
 		Padding: 2,
 	}
 
-	for i := uint(0); i < colNb; i++ {
+	for i := 0; i < colNb; i++ {
 		t.columns[i] = &column{}
 	}
 	return t
