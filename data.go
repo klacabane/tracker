@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+type UIComponent interface {
+	Print()
+}
+
 type dataFormatter interface {
 	sum() float64
 	key() string

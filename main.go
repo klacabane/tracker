@@ -193,6 +193,9 @@ func main() {
 					Name:  "category, cat",
 					Value: 0,
 				},
+				cli.BoolFlag{
+					Name: "graph, g",
+				},
 			},
 			Action: func(c *cli.Context) {
 				var (
@@ -279,10 +282,10 @@ func main() {
 				}
 
 				var (
-					total float64
+					component UIComponent
+					total     float64
 
-					rows  = make(map[string]float64)
-					table = NewTable(2)
+					rows = make(map[string]float64)
 				)
 				for i := 0; i < len(trackers); i++ {
 					res := <-chres
@@ -297,41 +300,23 @@ func main() {
 
 				}
 
-				for _, k := range <-chkeys {
-					sum := rows[k]
+				labels := <-chkeys
+				if c.Bool("graph") {
+					component = NewGraph(labels, rows)
+				} else {
+					table := NewTable(2)
+					for _, k := range labels {
+						sum := rows[k]
 
-					total += sum
-					table.Add(k, sum)
+						total += sum
+						table.Add(k, sum)
+					}
+					table.Add("Total", total)
+					table.Title = title
+
+					component = table
 				}
-				table.Add("Total", total)
-				table.Title = title
-
-				table.Print()
-			},
-		},
-		{
-			Name: "graph",
-			Action: func(c *cli.Context) {
-				res := result{
-					values: []dataFormatter{
-						weekData{22, 2014, 15},
-						weekData{52, 2015, 1},
-						weekData{200, 2012, 51},
-					},
-				}
-				sort.Sort(res)
-
-				var (
-					points = make(map[string]float64)
-					labels = make([]string, len(res.values))
-				)
-				for i, data := range res.values {
-					labels[i] = data.key()
-					points[data.key()] = data.sum()
-				}
-
-				g := NewGraph(labels, points)
-				g.Print()
+				component.Print()
 			},
 		},
 	}

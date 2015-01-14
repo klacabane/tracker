@@ -55,7 +55,7 @@ func (t *Table) Print() {
 	}
 	t.printSeparator()
 
-	if t.showColumNames() {
+	if t.showColumnNames() {
 		t.printRow(t.columnNames())
 		t.printSeparator()
 	}
@@ -102,7 +102,7 @@ func (t *Table) SetColumn(index int, value string) {
 	}
 }
 
-func (t *Table) showColumNames() bool {
+func (t *Table) showColumnNames() bool {
 	for _, col := range t.columns {
 		if len(col.name) > 0 {
 			return true
