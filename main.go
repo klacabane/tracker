@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"sort"
 	"time"
 
 	"github.com/codegangsta/cli"
@@ -283,7 +282,6 @@ func main() {
 
 				var (
 					component UIComponent
-					total     float64
 
 					rows = make(map[string]float64)
 				)
@@ -304,7 +302,7 @@ func main() {
 				if c.Bool("graph") {
 					component = NewGraph(labels, rows)
 				} else {
-					table := NewTable(2)
+					table, total := NewTable(2), float64(0)
 					for _, k := range labels {
 						sum := rows[k]
 

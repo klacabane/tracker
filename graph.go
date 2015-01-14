@@ -49,18 +49,9 @@ func NewGraph(labels []string, points map[string]float64) *Graph {
 func (g *Graph) Print() {
 	g.compute()
 
-	var (
-		line         string
-		penult, last bool
-
-		spaces = spacestr(g.paddingLeft)
-	)
-
+	spaces := spacestr(g.paddingLeft)
 	for i := 0; i < g.height; i++ {
-		line = ""
-		penult = i == g.height-2
-		last = i == g.height-1
-
+		last, penult, line := i == g.height-1, i == g.height-2, ""
 		for j := 0; j < g.width; j++ {
 			if last {
 				if label, ok := g.x[j]; ok {
