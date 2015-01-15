@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 )
 
 var (
@@ -18,8 +19,8 @@ type Graph struct {
 
 	labels      []string
 	values      []float64
-	x           map[int]string
-	y           map[int]float64
+	ord         map[int]string
+	abs         map[int]float64
 	points      map[string]float64
 	coordinates []coord
 	paddingLeft int
@@ -34,8 +35,8 @@ func NewGraph(labels []string, points map[string]float64) *Graph {
 	g := &Graph{
 		labels:      labels,
 		values:      make([]float64, 0),
-		x:           make(map[int]string),
-		y:           make(map[int]float64),
+		ord:         make(map[int]string),
+		abs:         make(map[int]float64),
 		coordinates: make([]coord, 0),
 		points:      points,
 	}
@@ -57,7 +58,7 @@ func (g *Graph) Print() {
 		last, penult, line := i == g.height-1, i == g.height-2, ""
 		for j := 0; j < g.width; j++ {
 			if last {
-				if label, ok := g.x[j]; ok {
+				if label, ok := g.ord[j]; ok {
 					line += label
 					j += len(label) - 1
 				} else if j == g.paddingLeft {
@@ -74,7 +75,7 @@ func (g *Graph) Print() {
 			} else if j == g.paddingLeft {
 				line += "|"
 			} else if j == 0 {
-				if val, ok := g.y[i]; ok {
+				if val, ok := g.abs[i]; ok {
 					sval := fmt.Sprintf("%d", int(val))
 
 					if diff := g.paddingLeft - len(sval); diff > 0 {
@@ -107,55 +108,23 @@ func (g *Graph) hasPoint(x, y int) bool {
 func (g *Graph) compute() {
 	ch := make(chan struct{}, 1)
 
-	// abscissa
 	go g.computeAbs(ch)
-
-	g.setPaddingLeft()
-
-	// ordinate
-	x := g.paddingLeft + 1 + marginX/2
-	for _, label := range g.labels {
-		g.x[x] = label
-		x += len(label) + marginX
-	}
-
-	g.width = x - marginX/2
+	g.computeOrd()
 
 	<-ch
-	for label, value := range g.points {
-		var c coord
-		for pos, lab := range g.x {
-			if lab == label {
-				c.x = pos + len(lab)/2
-			}
-		}
-		for pos, val := range g.y {
-			if val == value {
-				c.y = pos
-			}
-		}
-		g.coordinates = append(g.coordinates, c)
-	}
+	g.addCoordinates()
 }
 
-func spacestr(length int) func() string {
-	spaces := ""
-	for i := 0; i < length; i++ {
-		spaces += " "
+func (g *Graph) computeOrd() {
+	g.setPaddingLeft()
+
+	g.width = g.paddingLeft + 1 /*border*/ + marginX/2
+	for _, label := range g.labels {
+		g.ord[g.width] = label
+		g.width += len(label) + marginX
 	}
 
-	return func() string {
-		return spaces
-	}
-}
-
-func contains(sl []float64, val float64) bool {
-	for _, v := range sl {
-		if v == val {
-			return true
-		}
-	}
-	return false
+	g.width -= marginX / 2
 }
 
 func (g *Graph) computeAbs(ch chan<- struct{}) {
@@ -176,23 +145,51 @@ func (g *Graph) computeAbs(ch chan<- struct{}) {
 		diff := int(max - val)
 		if diff > 0 {
 			y := (diff / scale) + topMargin
-			if _, ok := g.y[y]; ok {
+			if _, ok := g.abs[y]; ok {
 				for ok {
 					y++
-					_, ok = g.y[y]
+					_, ok = g.abs[y]
 				}
 			}
 
 			gap := y - g.height
 			g.height += gap
 		} else {
+			// top value
 			g.height += topMargin
 		}
-		g.y[g.height] = val
+		g.abs[g.height] = val
 	}
 	g.height += marginY
 
 	ch <- struct{}{}
+}
+
+func (g *Graph) addCoordinates() {
+	var wg sync.WaitGroup
+	wg.Add(len(g.points))
+
+	for label, value := range g.points {
+		go g.addCoordinate(label, value, &wg)
+	}
+	wg.Wait()
+}
+
+func (g *Graph) addCoordinate(label string, value float64, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	var c coord
+	for pos, lab := range g.ord {
+		if lab == label {
+			c.x = pos + len(lab)/2
+		}
+	}
+	for pos, val := range g.abs {
+		if val == value {
+			c.y = pos
+		}
+	}
+	g.coordinates = append(g.coordinates, c)
 }
 
 func (g *Graph) setPaddingLeft() {
@@ -201,4 +198,22 @@ func (g *Graph) setPaddingLeft() {
 			g.paddingLeft = width
 		}
 	}
+}
+
+// helpers
+func spacestr(length int) func() string {
+	spaces := strings.Repeat(" ", length)
+
+	return func() string {
+		return spaces
+	}
+}
+
+func contains(sl []float64, val float64) bool {
+	for _, v := range sl {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }
