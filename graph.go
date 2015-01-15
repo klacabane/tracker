@@ -3,11 +3,14 @@ package main
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 var (
-	valueMargin = 4
-	labelMargin = 8
+	maxHeight = 20
+
+	marginY = 4
+	marginX = 8
 )
 
 type Graph struct {
@@ -75,9 +78,7 @@ func (g *Graph) Print() {
 					sval := fmt.Sprintf("%d", int(val))
 
 					if diff := g.paddingLeft - len(sval); diff > 0 {
-						for k := 0; k < diff; k++ {
-							line += " "
-						}
+						line += strings.Repeat(" ", diff)
 					}
 					line += sval
 				} else {
@@ -104,30 +105,23 @@ func (g *Graph) hasPoint(x, y int) bool {
 }
 
 func (g *Graph) compute() {
+	ch := make(chan struct{}, 1)
+
 	// abscissa
-	sort.Float64s(g.values)
+	go g.computeAbs(ch)
 
-	height := valueMargin / 2
-	for i := len(g.values) - 1; i >= 0; i-- {
-		val := g.values[i]
-
-		if length := len(fmt.Sprintf("%d", int(val))); length > g.paddingLeft {
-			g.paddingLeft = length
-		}
-		g.y[height] = val
-		height += valueMargin
-	}
-	g.height = height + 2
+	g.setPaddingLeft()
 
 	// ordinate
-	current := g.paddingLeft + 1 + labelMargin
+	x := g.paddingLeft + 1 + marginX/2
 	for _, label := range g.labels {
-		g.x[current] = label
-		current += len(label) + labelMargin
+		g.x[x] = label
+		x += len(label) + marginX
 	}
 
-	g.width = current - labelMargin/2
+	g.width = x - marginX/2
 
+	<-ch
 	for label, value := range g.points {
 		var c coord
 		for pos, lab := range g.x {
@@ -162,4 +156,49 @@ func contains(sl []float64, val float64) bool {
 		}
 	}
 	return false
+}
+
+func (g *Graph) computeAbs(ch chan<- struct{}) {
+	sort.Float64s(g.values)
+
+	max, min, topMargin := g.values[len(g.values)-1], g.values[0], marginY/2
+	gap := int(max - min)
+
+	// increase gap to nearest number % maxHeight == 0
+	for gap%maxHeight > 0 {
+		gap++
+	}
+	scale := gap / maxHeight
+
+	for i := len(g.values) - 1; i >= 0; i-- {
+		val := g.values[i]
+
+		diff := int(max - val)
+		if diff > 0 {
+			y := (diff / scale) + topMargin
+			if _, ok := g.y[y]; ok {
+				for ok {
+					y++
+					_, ok = g.y[y]
+				}
+			}
+
+			gap := y - g.height
+			g.height += gap
+		} else {
+			g.height += topMargin
+		}
+		g.y[g.height] = val
+	}
+	g.height += marginY
+
+	ch <- struct{}{}
+}
+
+func (g *Graph) setPaddingLeft() {
+	for _, value := range g.values {
+		if width := len(fmt.Sprintf("%d", int(value))); width > g.paddingLeft {
+			g.paddingLeft = width
+		}
+	}
 }

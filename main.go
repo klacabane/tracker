@@ -219,7 +219,9 @@ func main() {
 				go keys(period, occurence, chkeys)
 
 				if len(trackers) == 1 {
-					if trackers[0] == "all" {
+					title = trackers[0]
+
+					if title == "all" {
 						var err error
 
 						trackers, err = dblist()
@@ -227,8 +229,6 @@ func main() {
 							fmt.Println(err)
 							return
 						}
-					} else {
-						title = trackers[0]
 					}
 				}
 
@@ -315,6 +315,23 @@ func main() {
 					component = table
 				}
 				component.Print()
+			},
+		},
+		{
+			Name: "graph",
+			Action: func(c *cli.Context) {
+				m := map[string]float64{
+					"1": 15,
+					"2": 100,
+					"3": 3000,
+					"4": 700,
+					"5": 1500,
+					"6": 110,
+					"7": 2900,
+					"8": 3500,
+				}
+				graph := NewGraph([]string{"1", "2", "3", "4", "5", "6", "7", "8"}, m)
+				graph.Print()
 			},
 		},
 	}
