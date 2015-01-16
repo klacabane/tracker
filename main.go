@@ -289,6 +289,9 @@ func main() {
 					res := <-chres
 					if res.err != nil {
 						fmt.Println(res.err)
+						if res.err == ErrInvalidDB {
+							continue
+						}
 						return
 					}
 

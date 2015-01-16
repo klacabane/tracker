@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,6 +47,7 @@ func TestAddCoordinates(t *testing.T) {
 	graph.addCoordinates()
 
 	assert.Equal(t, 4, len(graph.coordinates))
-	assert.True(t, graph.hasPoint(graph.width-(5+marginX+marginX/2), marginY/2))
-	fmt.Printf(" %+v\n", graph.points)
+
+	x, y := graph.width-(marginX/2+1+marginX+1), marginY/2
+	assert.True(t, graph.hasPoint(x, y))
 }
