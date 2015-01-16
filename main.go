@@ -41,7 +41,6 @@ func main() {
 				table.Title = "TRACKERS"
 				for _, tracker := range trackers {
 					table.Add(tracker)
-
 				}
 				table.Print()
 			},
@@ -198,10 +197,11 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
-					period    = c.String("period")
-					occurence = c.Int("occurence")
-					category  = c.Int("category")
-					trackers  = c.StringSlice("t")
+					period      = c.String("period")
+					occurence   = c.Int("occurence")
+					category    = c.Int("category")
+					trackers    = c.StringSlice("t")
+					trackerslen = len(trackers)
 
 					chkeys = make(chan []string, 1)
 				)
@@ -218,10 +218,8 @@ func main() {
 
 				go keys(period, occurence, chkeys)
 
-				if len(trackers) == 1 {
-					title = trackers[0]
-
-					if title == "all" {
+				if trackerslen == 1 {
+					if title = trackers[0]; title == "all" {
 						var err error
 
 						trackers, err = dblist()
@@ -229,15 +227,16 @@ func main() {
 							fmt.Println(err)
 							return
 						}
+						trackerslen = len(trackers)
 					}
 				}
 
-				if len(trackers) > 1 && category != 0 {
+				if trackerslen > 1 && category != 0 {
 					category = 0
 					fmt.Println("ignoring category flag.")
 				}
 
-				chres := make(chan result, len(trackers))
+				chres := make(chan result, trackerslen)
 				for _, tracker := range trackers {
 					go func(dbname string) {
 						var res result
@@ -285,7 +284,7 @@ func main() {
 
 					rows = make(map[string]float64)
 				)
-				for i := 0; i < len(trackers); i++ {
+				for i := 0; i < trackerslen; i++ {
 					res := <-chres
 					if res.err != nil {
 						fmt.Println(res.err)
