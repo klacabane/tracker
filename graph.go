@@ -17,12 +17,15 @@ var (
 type Graph struct {
 	height, width int
 
-	labels      []string
-	values      []float64
-	ord         map[int]string
-	abs         map[int]float64
+	values []float64
+	labels []string
+
+	abs map[int]float64
+	ord map[int]string
+
 	points      map[string]float64
 	coordinates []coord
+
 	paddingLeft int
 }
 
