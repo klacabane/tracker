@@ -26,7 +26,7 @@ type Graph struct {
 	points      map[string]float64
 	coordinates []coord
 
-	paddingLeft int
+	offset int
 }
 
 type coord struct {
@@ -56,7 +56,7 @@ func NewGraph(labels []string, points map[string]float64) *Graph {
 func (g *Graph) Print() {
 	g.compute()
 
-	spaces := spacestr(g.paddingLeft)
+	spaces := strings.Repeat(" ", g.offset)
 	for i := 0; i < g.height; i++ {
 		last, penult, line := i == g.height-1, i == g.height-2, ""
 		for j := 0; j < g.width; j++ {
@@ -64,33 +64,33 @@ func (g *Graph) Print() {
 				if label, ok := g.ord[j]; ok {
 					line += label
 					j += len(label) - 1
-				} else if j == g.paddingLeft {
+				} else if j == g.offset {
 					line += "|"
 				} else {
 					line += " "
 				}
 			} else if penult {
-				if j == g.paddingLeft {
+				if j == g.offset {
 					line += "|"
 				} else {
 					line += "_"
 				}
-			} else if j == g.paddingLeft {
+			} else if j == g.offset {
 				line += "|"
 			} else if j == 0 {
 				if val, ok := g.abs[i]; ok {
 					sval := fmt.Sprintf("%d", int(val))
 
-					if diff := g.paddingLeft - len(sval); diff > 0 {
+					if diff := g.offset - len(sval); diff > 0 {
 						line += strings.Repeat(" ", diff)
 					}
 					line += sval
 				} else {
-					line += spaces()
+					line += spaces
 				}
 			} else if g.hasPoint(j, i) {
 				line += "+"
-			} else if j > g.paddingLeft {
+			} else if j > g.offset {
 				line += " "
 			}
 
@@ -119,9 +119,9 @@ func (g *Graph) compute() {
 }
 
 func (g *Graph) computeOrd() {
-	g.setPaddingLeft()
+	g.setOffset()
 
-	g.width = g.paddingLeft + 1 /*border*/ + marginX/2
+	g.width = g.offset + 1 /*border*/ + marginX/2
 	for _, label := range g.labels {
 		g.ord[g.width] = label
 		g.width += len(label) + marginX
@@ -195,23 +195,15 @@ func (g *Graph) addCoordinate(label string, value float64, wg *sync.WaitGroup) {
 	g.coordinates = append(g.coordinates, c)
 }
 
-func (g *Graph) setPaddingLeft() {
+func (g *Graph) setOffset() {
 	for _, value := range g.values {
-		if width := len(fmt.Sprintf("%d", int(value))); width > g.paddingLeft {
-			g.paddingLeft = width
+		if width := len(fmt.Sprintf("%d", int(value))); width > g.offset {
+			g.offset = width
 		}
 	}
 }
 
 // helpers
-func spacestr(length int) func() string {
-	spaces := strings.Repeat(" ", length)
-
-	return func() string {
-		return spaces
-	}
-}
-
 func contains(sl []float64, val float64) bool {
 	for _, v := range sl {
 		if v == val {

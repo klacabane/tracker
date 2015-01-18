@@ -12,6 +12,7 @@ type dataFormatter interface {
 	sum() float64
 	key() string
 	less(dataFormatter) bool
+	prev() dataFormatter
 }
 
 type result struct {
@@ -48,6 +49,10 @@ func (yd yearData) less(comp dataFormatter) bool {
 	return yd.year < comp.(yearData).year
 }
 
+func (yd yearData) prev() dataFormatter {
+	return yearData{0, yd.year - 1}
+}
+
 type monthData struct {
 	qty         float64
 	year, month int
@@ -67,6 +72,11 @@ func (md monthData) less(v dataFormatter) bool {
 	return md.year < comp.year || (md.year == comp.year && md.month < comp.month)
 }
 
+func (md monthData) prev() dataFormatter {
+	md.year, md.month = computeLimitMonth(md.year, md.month, 1)
+	return md
+}
+
 type weekData struct {
 	qty        float64
 	year, week int
@@ -84,5 +94,9 @@ func (wd weekData) less(v dataFormatter) bool {
 	comp := v.(weekData)
 
 	return wd.year < comp.year || (wd.year == comp.year && wd.week < comp.week)
+}
 
+func (wd weekData) prev() dataFormatter {
+	wd.year, wd.week = computeLimitWeek(wd.year, wd.week, 1)
+	return wd
 }

@@ -297,7 +297,6 @@ func main() {
 					for _, data := range res.values {
 						rows[data.key()] += data.sum()
 					}
-
 				}
 
 				labels := <-chkeys
@@ -370,63 +369,31 @@ func computeLimitWeek(year, week, n int) (int, int) {
 }
 
 func keys(p string, n int, c chan<- []string) {
+	var (
+		keys = make([]string, n+1)
+
+		date       = time.Now()
+		year, week = date.ISOWeek()
+		month      = int(date.Month())
+
+		df dataFormatter
+	)
+
 	if p == "w" {
-		c <- weekKeys(n)
+		df = weekData{0, year, week}
 	} else if p == "m" {
-		c <- monthKeys(n)
+		df = monthData{0, year, month}
 	} else {
-		c <- yearKeys(n)
+		df = yearData{0, year}
 	}
-}
-
-func weekKeys(n int) []string {
-	var (
-		keys       = make([]string, n+1)
-		year, week = time.Now().ISOWeek()
-
-		wd = weekData{0, year, week}
-	)
 
 	for n >= 0 {
-		keys[n] = wd.key()
-		wd.year, wd.week = computeLimitWeek(wd.year, wd.week, 1)
+		keys[n] = df.key()
+		df = df.prev()
 
 		n--
 	}
-	return keys
-}
-
-func monthKeys(n int) []string {
-	var (
-		keys = make([]string, n+1)
-		date = time.Now()
-
-		md = monthData{0, date.Year(), int(date.Month())}
-	)
-
-	for n >= 0 {
-		keys[n] = md.key()
-		md.year, md.month = computeLimitMonth(md.year, md.month, 1)
-
-		n--
-	}
-	return keys
-}
-
-func yearKeys(n int) []string {
-	var (
-		keys = make([]string, n+1)
-
-		yd = yearData{0, time.Now().Year()}
-	)
-
-	for n >= 0 {
-		keys[n] = yd.key()
-		yd.year--
-
-		n--
-	}
-	return keys
+	c <- keys
 }
 
 func isLongYear(year int) bool {
