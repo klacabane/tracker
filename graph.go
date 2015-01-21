@@ -109,6 +109,10 @@ func (g *Graph) hasPoint(x, y int) bool {
 }
 
 func (g *Graph) compute() {
+	if len(g.labels) == 0 || len(g.values) == 0 {
+		return
+	}
+
 	ch := make(chan struct{}, 1)
 
 	go g.computeAbs(ch)
