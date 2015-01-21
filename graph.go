@@ -79,7 +79,7 @@ func (g *Graph) Print() {
 				line += "|"
 			} else if j == 0 {
 				if val, ok := g.abs[i]; ok {
-					sval := fmt.Sprintf("%d", int(val))
+					sval := fmt.Sprintf("%v", val)
 
 					if diff := g.offset - len(sval); diff > 0 {
 						line += strings.Repeat(" ", diff)
@@ -197,7 +197,7 @@ func (g *Graph) addCoordinate(label string, value float64, wg *sync.WaitGroup) {
 
 func (g *Graph) setOffset() {
 	for _, value := range g.values {
-		if width := len(fmt.Sprintf("%d", int(value))); width > g.offset {
+		if width := len(fmt.Sprintf("%v", value)); width > g.offset {
 			g.offset = width
 		}
 	}

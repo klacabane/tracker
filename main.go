@@ -84,15 +84,17 @@ func main() {
 			Action: func(c *cli.Context) {
 				var (
 					category int
-					quantity float64
+					quantity int64
 				)
 
-				if quantity = c.Float64("qty"); quantity == 0 {
+				if qtyf := c.Float64("qty"); qtyf == 0 {
 					fmt.Println("no quantity specified.")
 					return
+				} else {
+					quantity = int64(qtyf * 100)
 				}
 
-				err := withDBContext(c.Args().First(), func(db *DB) error {
+				if err := withDBContext(c.Args().First(), func(db *DB) error {
 					if category = c.Int("cat"); category != 1 {
 						_, err := db.getCategory(category)
 						if err != nil {
@@ -103,8 +105,7 @@ func main() {
 					year, week := time.Now().ISOWeek()
 
 					return db.addRecord(quantity, category, year, week)
-				})
-				if err != nil {
+				}); err != nil {
 					fmt.Println(err)
 				}
 			},
@@ -117,7 +118,7 @@ func main() {
 				{
 					Name: "list",
 					Action: func(c *cli.Context) {
-						err := withDBContext(c.Args().First(), func(db *DB) error {
+						if err := withDBContext(c.Args().First(), func(db *DB) error {
 							categories, err := db.getCategories()
 							if err != nil {
 								return err
@@ -131,8 +132,7 @@ func main() {
 							table.Print()
 
 							return nil
-						})
-						if err != nil {
+						}); err != nil {
 							fmt.Println(err)
 						}
 					},
@@ -148,10 +148,9 @@ func main() {
 							return
 						}
 
-						err := withDBContext(c.Args().First(), func(db *DB) error {
+						if err := withDBContext(c.Args().First(), func(db *DB) error {
 							return db.addCategories(c.Args()[1:]...)
-						})
-						if err != nil {
+						}); err != nil {
 							fmt.Println(err)
 						}
 					},
@@ -173,7 +172,7 @@ func main() {
 				},
 				cli.IntFlag{
 					Name:  "occurence, o",
-					Value: 0,
+					Value: 2,
 				},
 				cli.IntFlag{
 					Name:  "category, cat",
@@ -255,7 +254,7 @@ func main() {
 				var (
 					component UIComponent
 
-					rows = make(map[string]float64)
+					rows = make(map[string]int64)
 				)
 				for i := 0; i < trackerslen; i++ {
 					res := <-chres
@@ -274,16 +273,21 @@ func main() {
 
 				labels := <-chkeys
 				if c.Bool("graph") {
-					component = NewGraph(labels, rows)
+					rowsf := make(map[string]float64)
+					for k, v := range rows {
+						rowsf[k] = float64(v) / 100
+					}
+
+					component = NewGraph(labels, rowsf)
 				} else {
-					table, total := NewTable(2), float64(0)
+					table, total := NewTable(2), int64(0)
 					for _, k := range labels {
 						sum := rows[k]
 
 						total += sum
-						table.Add(k, sum)
+						table.Add(k, float64(sum)/100)
 					}
-					table.Add("Total", total)
+					table.Add("Total", float64(total)/100)
 					table.Title = title
 
 					component = table
@@ -295,14 +299,14 @@ func main() {
 			Name: "graph",
 			Action: func(c *cli.Context) {
 				m := map[string]float64{
-					"1": 15,
-					"2": 100,
-					"3": 3000,
-					"4": 700,
-					"5": 1500,
-					"6": 110,
-					"7": 2900,
-					"8": 3500,
+					"1": 0.15,
+					"2": 0.100,
+					"3": 0.3000,
+					"4": 0.700,
+					"5": 0.1500,
+					"6": 0.110,
+					"7": 0.2900,
+					"8": 0.35551,
 				}
 				graph := NewGraph([]string{"1", "2", "3", "4", "5", "6", "7", "8"}, m)
 				graph.Print()

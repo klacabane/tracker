@@ -206,7 +206,7 @@ func (db *DB) getCategories() (map[int]string, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) addRecord(qty float64, category, year, week int) error {
+func (db *DB) addRecord(qty int64, category, year, week int) error {
 	_, err := db.Exec("insert into records(qty, category, isoyear, isoweek) values(?, ?, ?, ?)",
 		qty, category, year, week)
 	return err

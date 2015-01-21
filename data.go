@@ -9,7 +9,7 @@ type UIComponent interface {
 }
 
 type dataFormatter interface {
-	sum() float64
+	sum() int64
 	key() string
 	less(dataFormatter) bool
 	prev() dataFormatter
@@ -33,11 +33,11 @@ func (r result) Less(i, j int) bool {
 }
 
 type yearData struct {
-	qty  float64
+	qty  int64
 	year int
 }
 
-func (yd yearData) sum() float64 {
+func (yd yearData) sum() int64 {
 	return yd.qty
 }
 
@@ -54,11 +54,11 @@ func (yd yearData) prev() dataFormatter {
 }
 
 type monthData struct {
-	qty         float64
+	qty         int64
 	year, month int
 }
 
-func (md monthData) sum() float64 {
+func (md monthData) sum() int64 {
 	return md.qty
 }
 
@@ -78,11 +78,11 @@ func (md monthData) prev() dataFormatter {
 }
 
 type weekData struct {
-	qty        float64
+	qty        int64
 	year, week int
 }
 
-func (wd weekData) sum() float64 {
+func (wd weekData) sum() int64 {
 	return wd.qty
 }
 
