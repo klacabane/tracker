@@ -92,24 +92,18 @@ func main() {
 					return
 				}
 
-				db, err := openFromContext(c)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-				defer db.Close()
-
-				if category = c.Int("cat"); category != 1 {
-					_, err = db.getCategory(category)
-					if err != nil {
-						fmt.Println(err)
-						return
+				err := withDBContext(c.Args().First(), func(db *DB) error {
+					if category = c.Int("cat"); category != 1 {
+						_, err := db.getCategory(category)
+						if err != nil {
+							return err
+						}
 					}
-				}
 
-				year, week := time.Now().ISOWeek()
+					year, week := time.Now().ISOWeek()
 
-				err = db.addRecord(quantity, category, year, week)
+					return db.addRecord(quantity, category, year, week)
+				})
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -123,25 +117,24 @@ func main() {
 				{
 					Name: "list",
 					Action: func(c *cli.Context) {
-						db, err := openFromContext(c)
+						err := withDBContext(c.Args().First(), func(db *DB) error {
+							categories, err := db.getCategories()
+							if err != nil {
+								return err
+							}
+
+							table := NewTable(2)
+							table.Title = "CATEGORIES"
+							for k, v := range categories {
+								table.Add(k, v)
+							}
+							table.Print()
+
+							return nil
+						})
 						if err != nil {
 							fmt.Println(err)
-							return
 						}
-						defer db.Close()
-
-						categories, err := db.getCategories()
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-
-						table := NewTable(2)
-						table.Title = "CATEGORIES"
-						for k, v := range categories {
-							table.Add(k, v)
-						}
-						table.Print()
 					},
 				},
 				{
@@ -155,14 +148,9 @@ func main() {
 							return
 						}
 
-						db, err := openFromContext(c)
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-						defer db.Close()
-
-						err = db.addCategories(c.Args()[1:]...)
+						err := withDBContext(c.Args().First(), func(db *DB) error {
+							return db.addCategories(c.Args()[1:]...)
+						})
 						if err != nil {
 							fmt.Println(err)
 						}
@@ -239,43 +227,28 @@ func main() {
 				chres := make(chan result, trackerslen)
 				for _, tracker := range trackers {
 					go func(dbname string) {
-						var res result
+						var res []dataFormatter
 
-						p := dbpath(dbname)
-						if !exists(p) {
-							res.err = ErrInvalidDB
-							chres <- res
-							return
-						}
-
-						db, err := open(p)
-						if err != nil {
-							res.err = err
-							chres <- res
-							return
-						}
-						defer db.Close()
-
-						if category > 0 {
-							name, err := db.getCategory(category)
-							if err != nil {
-								res.err = err
-								chres <- res
-								return
+						err = withDBContext(dbname, func(db *DB) error {
+							if category > 0 {
+								name, err := db.getCategory(category)
+								if err != nil {
+									return err
+								}
+								title += " " + name
 							}
-							title += " " + name
-						}
 
-						switch period {
-						case "w":
-							res.values, res.err = db.queryWeek(occurence, category)
-						case "m":
-							res.values, res.err = db.queryMonth(occurence, category)
-						case "y":
-							res.values, res.err = db.queryYear(occurence, category)
-						}
-
-						chres <- res
+							switch period {
+							case "w":
+								res, err = db.queryWeek(occurence, category)
+							case "m":
+								res, err = db.queryMonth(occurence, category)
+							case "y":
+								res, err = db.queryYear(occurence, category)
+							}
+							return err
+						})
+						chres <- result{err: err, values: res}
 					}(tracker)
 				}
 

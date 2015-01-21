@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/codegangsta/cli"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -287,17 +286,23 @@ func exists(p string) bool {
 	return true
 }
 
-func openFromContext(c *cli.Context) (*DB, error) {
-	dbname := c.Args().First()
+func withDBContext(dbname string, fn func(*DB) error) error {
 	if dbname == "" {
-		return nil, ErrNoName
+		return ErrNoName
 	}
 
 	p := dbpath(dbname)
 	if !exists(p) {
-		return nil, ErrInvalidDB
+		return ErrInvalidDB
 	}
-	return open(p)
+
+	db, err := open(p)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return fn(db)
 }
 
 func dbpath(name string) string {

@@ -56,7 +56,7 @@ func NewGraph(labels []string, points map[string]float64) *Graph {
 func (g *Graph) Print() {
 	g.compute()
 
-	spaces := strings.Repeat(" ", g.offset)
+	offset := strings.Repeat(" ", g.offset)
 	for i := 0; i < g.height; i++ {
 		last, penult, line := i == g.height-1, i == g.height-2, ""
 		for j := 0; j < g.width; j++ {
@@ -86,7 +86,7 @@ func (g *Graph) Print() {
 					}
 					line += sval
 				} else {
-					line += spaces
+					line += offset
 				}
 			} else if g.hasPoint(j, i) {
 				line += "+"
