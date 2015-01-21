@@ -20,9 +20,9 @@ type timeData struct {
 
 func (data timeData) Key() string {
 	if data.week > 0 {
-		return fmt.Sprintf("%d-W%s", data.year, monthVal(data.week))
+		return fmt.Sprintf("%d-W%02d", data.year, data.week)
 	} else if data.month > 0 {
-		return fmt.Sprintf("%d-%s", data.year, monthVal(data.month))
+		return fmt.Sprintf("%d-%02d", data.year, data.month)
 	}
 	return fmt.Sprintf("%d", data.year)
 }

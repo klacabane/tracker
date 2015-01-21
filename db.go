@@ -80,12 +80,12 @@ func (db *DB) queryMonth(occurence, category int) ([]timeData, error) {
 	if occurence == 0 {
 		query = "select quantity, isoyear, month from (" +
 			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
-			"from records where strftime('%m', date) = " + fmt.Sprintf("'%s' ", monthVal(int(month))) +
-			"and strftime('%Y', date) = " + fmt.Sprintf("'%s' ", strconv.Itoa(year)) + condition +
+			"from records where strftime('%m', date) = " + fmt.Sprintf("'%02d' ", int(month)) +
+			"and strftime('%Y', date) = " + fmt.Sprintf("'%d' ", year) + condition +
 			") where quantity is not null"
 	} else {
 		y, m := computeLimitMonth(year, int(month), occurence)
-		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%s' ", monthVal(int(m)))
+		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%02d' ", int(m))
 
 		query = "select quantity, isoyear, month from (" +
 			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
@@ -217,14 +217,6 @@ func catCondition(category int) (cond string) {
 		cond = fmt.Sprintf("and category = %d ", category)
 	}
 	return
-}
-
-func monthVal(m int) string {
-	str := strconv.Itoa(m)
-	if m < 10 {
-		str = "0" + str
-	}
-	return str
 }
 
 // Helpers
