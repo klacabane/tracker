@@ -8,95 +8,38 @@ type UIComponent interface {
 	Print()
 }
 
-type dataFormatter interface {
-	sum() int64
-	key() string
-	less(dataFormatter) bool
-	prev() dataFormatter
-}
-
 type result struct {
-	values []dataFormatter
+	values []timeData
 	err    error
 }
 
-func (r result) Len() int {
-	return len(r.values)
+type timeData struct {
+	qty               int64
+	year, month, week int
 }
 
-func (r result) Swap(i, j int) {
-	r.values[i], r.values[j] = r.values[j], r.values[i]
+func (data timeData) Key() string {
+	if data.week > 0 {
+		return fmt.Sprintf("%d-W%s", data.year, monthVal(data.week))
+	} else if data.month > 0 {
+		return fmt.Sprintf("%d-%s", data.year, monthVal(data.month))
+	}
+	return fmt.Sprintf("%d", data.year)
 }
 
-func (r result) Less(i, j int) bool {
-	return r.values[i].less(r.values[j])
+func (data timeData) Quantity() int64 {
+	return data.qty
 }
 
-type yearData struct {
-	qty  int64
-	year int
-}
+func (data timeData) Prev() timeData {
+	var prev timeData
 
-func (yd yearData) sum() int64 {
-	return yd.qty
-}
-
-func (yd yearData) key() string {
-	return fmt.Sprintf("%d", yd.year)
-}
-
-func (yd yearData) less(comp dataFormatter) bool {
-	return yd.year < comp.(yearData).year
-}
-
-func (yd yearData) prev() dataFormatter {
-	return yearData{0, yd.year - 1}
-}
-
-type monthData struct {
-	qty         int64
-	year, month int
-}
-
-func (md monthData) sum() int64 {
-	return md.qty
-}
-
-func (md monthData) key() string {
-	return fmt.Sprintf("%d-%s", md.year, monthVal(md.month))
-}
-
-func (md monthData) less(v dataFormatter) bool {
-	comp := v.(monthData)
-
-	return md.year < comp.year || (md.year == comp.year && md.month < comp.month)
-}
-
-func (md monthData) prev() dataFormatter {
-	md.year, md.month = computeLimitMonth(md.year, md.month, 1)
-	return md
-}
-
-type weekData struct {
-	qty        int64
-	year, week int
-}
-
-func (wd weekData) sum() int64 {
-	return wd.qty
-}
-
-func (wd weekData) key() string {
-	return fmt.Sprintf("%d-W%s", wd.year, monthVal(wd.week))
-}
-
-func (wd weekData) less(v dataFormatter) bool {
-	comp := v.(weekData)
-
-	return wd.year < comp.year || (wd.year == comp.year && wd.week < comp.week)
-}
-
-func (wd weekData) prev() dataFormatter {
-	wd.year, wd.week = computeLimitWeek(wd.year, wd.week, 1)
-	return wd
+	if data.week > 0 {
+		prev.year, prev.week = computeLimitWeek(data.year, data.week, 1)
+	} else if data.month > 0 {
+		prev.year, prev.month = computeLimitMonth(data.year, data.month, 1)
+	} else {
+		prev.year = data.year - 1
+	}
+	return prev
 }

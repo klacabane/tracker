@@ -25,11 +25,11 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(occurence, category int) ([]dataFormatter, error) {
+func (db *DB) queryWeek(occurence, category int) ([]timeData, error) {
 	var (
 		year, week = time.Now().ISOWeek()
 		condition  = catCondition(category)
-		res        = make([]dataFormatter, 0)
+		res        = make([]timeData, 0)
 
 		query string
 	)
@@ -55,24 +55,24 @@ func (db *DB) queryWeek(occurence, category int) ([]dataFormatter, error) {
 	}
 	defer rows.Close()
 
-	var wdata weekData
+	var data timeData
 	for rows.Next() {
-		err = rows.Scan(&wdata.qty, &wdata.year, &wdata.week)
+		err = rows.Scan(&data.qty, &data.year, &data.week)
 		if err != nil {
 			return res, err
 		}
-		res = append(res, wdata)
+		res = append(res, data)
 	}
 
 	return res, rows.Err()
 }
 
-func (db *DB) queryMonth(occurence, category int) ([]dataFormatter, error) {
+func (db *DB) queryMonth(occurence, category int) ([]timeData, error) {
 	var (
 		date        = time.Now()
 		year, month = date.Year(), date.Month()
 		condition   = catCondition(category)
-		res         = make([]dataFormatter, 0)
+		res         = make([]timeData, 0)
 
 		query string
 	)
@@ -102,23 +102,23 @@ func (db *DB) queryMonth(occurence, category int) ([]dataFormatter, error) {
 	}
 	defer rows.Close()
 
-	var mdata monthData
+	var data timeData
 	for rows.Next() {
-		err = rows.Scan(&mdata.qty, &mdata.year, &mdata.month)
+		err = rows.Scan(&data.qty, &data.year, &data.month)
 		if err != nil {
 			return res, err
 		}
-		res = append(res, mdata)
+		res = append(res, data)
 	}
 
 	return res, rows.Err()
 }
 
-func (db *DB) queryYear(occurence, category int) ([]dataFormatter, error) {
+func (db *DB) queryYear(occurence, category int) ([]timeData, error) {
 	var (
 		year      = time.Now().Year()
 		condition = catCondition(category)
-		res       = make([]dataFormatter, 0)
+		res       = make([]timeData, 0)
 
 		query string
 	)
@@ -141,13 +141,13 @@ func (db *DB) queryYear(occurence, category int) ([]dataFormatter, error) {
 	}
 	defer rows.Close()
 
-	var ydata yearData
+	var data timeData
 	for rows.Next() {
-		err = rows.Scan(&ydata.qty, &ydata.year)
+		err = rows.Scan(&data.qty, &data.year)
 		if err != nil {
 			return res, err
 		}
-		res = append(res, ydata)
+		res = append(res, data)
 	}
 
 	return res, rows.Err()

@@ -96,12 +96,10 @@ func main() {
 
 				if err := withDBContext(c.Args().First(), func(db *DB) error {
 					if category = c.Int("cat"); category != 1 {
-						_, err := db.getCategory(category)
-						if err != nil {
-							return err
+						if _, cerr := db.getCategory(category); cerr != nil {
+							return cerr
 						}
 					}
-
 					year, week := time.Now().ISOWeek()
 
 					return db.addRecord(quantity, category, year, week)
@@ -119,9 +117,9 @@ func main() {
 					Name: "list",
 					Action: func(c *cli.Context) {
 						if err := withDBContext(c.Args().First(), func(db *DB) error {
-							categories, err := db.getCategories()
-							if err != nil {
-								return err
+							categories, cerr := db.getCategories()
+							if cerr != nil {
+								return cerr
 							}
 
 							table := NewTable(2)
@@ -226,26 +224,28 @@ func main() {
 				chres := make(chan result, trackerslen)
 				for _, tracker := range trackers {
 					go func(dbname string) {
-						var res []dataFormatter
+						var res []timeData
 
 						err = withDBContext(dbname, func(db *DB) error {
+							var cerr error
+
 							if category > 0 {
-								name, err := db.getCategory(category)
-								if err != nil {
-									return err
+								name, cerr := db.getCategory(category)
+								if cerr != nil {
+									return cerr
 								}
 								title += " " + name
 							}
 
 							switch period {
 							case "w":
-								res, err = db.queryWeek(occurence, category)
+								res, cerr = db.queryWeek(occurence, category)
 							case "m":
-								res, err = db.queryMonth(occurence, category)
+								res, cerr = db.queryMonth(occurence, category)
 							case "y":
-								res, err = db.queryYear(occurence, category)
+								res, cerr = db.queryYear(occurence, category)
 							}
-							return err
+							return cerr
 						})
 						chres <- result{err: err, values: res}
 					}(tracker)
@@ -267,7 +267,7 @@ func main() {
 					}
 
 					for _, data := range res.values {
-						rows[data.key()] += data.sum()
+						rows[data.Key()] += data.Quantity()
 					}
 				}
 
@@ -353,20 +353,20 @@ func keys(p string, n int, c chan<- []string) {
 		year, week = date.ISOWeek()
 		month      = int(date.Month())
 
-		df dataFormatter
+		data timeData
 	)
 
 	if p == "w" {
-		df = weekData{0, year, week}
+		data = timeData{year: year, week: week}
 	} else if p == "m" {
-		df = monthData{0, year, month}
+		data = timeData{year: year, month: month}
 	} else {
-		df = yearData{0, year}
+		data = timeData{year: year}
 	}
 
 	for n >= 0 {
-		keys[n] = df.key()
-		df = df.prev()
+		keys[n] = data.Key()
+		data = data.Prev()
 
 		n--
 	}
