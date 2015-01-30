@@ -253,7 +253,7 @@ func open(p string) (*DB, error) {
 }
 
 func create(p string) error {
-	in, err := os.Open(path.Join(TRACKER_DIR, BASE_DB))
+	in, err := os.Open(dbpath(BASE_DB))
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	TRACKER_DIR, BASE_DB string
+	TRACKER_DIR, BASE_DB, DEFAULT_DB string
 )
 
 func init() {
@@ -19,7 +19,8 @@ func init() {
 		panic(err)
 	}
 	TRACKER_DIR = u.HomeDir + "/Dropbox/tracker/"
-	BASE_DB = "conf/base.db"
+	BASE_DB = "conf/base"
+	DEFAULT_DB = "default"
 }
 
 func main() {
@@ -52,7 +53,7 @@ func main() {
 			Action: func(c *cli.Context) {
 				dbname := c.Args().First()
 				if dbname == "" {
-					fmt.Println("name required.")
+					fmt.Println(ErrNoName)
 					return
 				}
 
@@ -72,6 +73,10 @@ func main() {
 		{
 			Name: "add",
 			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tracker, t",
+					Value: DEFAULT_DB,
+				},
 				cli.Float64Flag{
 					Name:  "quantity, qty",
 					Value: 0,
@@ -94,7 +99,7 @@ func main() {
 					quantity = int64(qtyf * 100)
 				}
 
-				if err := withDBContext(c.Args().First(), func(db *DB) error {
+				if err := withDBContext(c.String("t"), func(db *DB) error {
 					if category = c.Int("cat"); category != 1 {
 						if _, cerr := db.getCategory(category); cerr != nil {
 							return cerr
@@ -115,8 +120,14 @@ func main() {
 			Subcommands: []cli.Command{
 				{
 					Name: "list",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "tracker, t",
+							Value: DEFAULT_DB,
+						},
+					},
 					Action: func(c *cli.Context) {
-						if err := withDBContext(c.Args().First(), func(db *DB) error {
+						if err := withDBContext(c.String("t"), func(db *DB) error {
 							categories, cerr := db.getCategories()
 							if cerr != nil {
 								return cerr
@@ -137,17 +148,24 @@ func main() {
 				},
 				{
 					Name: "add",
+					Flags: []cli.Flag{
+						cli.StringFlag{
+							Name:  "tracker, t",
+							Value: DEFAULT_DB,
+						},
+						cli.StringSliceFlag{
+							Name:  "categories, cat",
+							Value: &cli.StringSlice{},
+						},
+					},
 					Action: func(c *cli.Context) {
-						if length := len(c.Args()); length == 0 {
-							fmt.Println(ErrNoName)
-							return
-						} else if length == 1 {
+						if length := len(c.StringSlice("cat")); length == 0 {
 							fmt.Println("no categories specified.")
 							return
 						}
 
-						if err := withDBContext(c.Args().First(), func(db *DB) error {
-							return db.addCategories(c.Args()[1:]...)
+						if err := withDBContext(c.String("t"), func(db *DB) error {
+							return db.addCategories(c.StringSlice("cat")...)
 						}); err != nil {
 							fmt.Println(err)
 						}
@@ -161,7 +179,7 @@ func main() {
 			ShortName: "agg",
 			Flags: []cli.Flag{
 				cli.StringSliceFlag{
-					Name:  "tracker, t",
+					Name:  "trackers, t",
 					Value: &cli.StringSlice{},
 				},
 				cli.StringFlag{
@@ -202,6 +220,11 @@ func main() {
 				}
 
 				go keys(period, occurence, chkeys)
+
+				if trackerslen == 0 {
+					trackers = append(trackers, DEFAULT_DB)
+					trackerslen++
+				}
 
 				if trackerslen == 1 {
 					if title = trackers[0]; title == "all" {
