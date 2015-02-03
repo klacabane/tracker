@@ -25,7 +25,7 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(occurence, category int) ([]timeData, error) {
+func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
 	var (
 		year, week = time.Now().ISOWeek()
 		condition  = catCondition(category)
@@ -34,14 +34,14 @@ func (db *DB) queryWeek(occurence, category int) ([]timeData, error) {
 		query string
 	)
 
-	if occurence == 0 {
+	if frequency == 0 {
 		// query concerns current week
 		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
 			"select sum(qty) as quantity, isoyear, isoweek from records "+
 			"where isoyear = %d and isoweek = %d %sgroup by isoweek"+
 			") where quantity is not null", year, week, condition)
 	} else {
-		year, week = computeLimitWeek(year, week, occurence)
+		year, week = computeLimitWeek(year, week, frequency)
 
 		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
 			"select sum(qty) as quantity, isoyear, isoweek from records "+
@@ -67,7 +67,7 @@ func (db *DB) queryWeek(occurence, category int) ([]timeData, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) queryMonth(occurence, category int) ([]timeData, error) {
+func (db *DB) queryMonth(frequency, category int) ([]timeData, error) {
 	var (
 		date        = time.Now()
 		year, month = date.Year(), date.Month()
@@ -77,14 +77,14 @@ func (db *DB) queryMonth(occurence, category int) ([]timeData, error) {
 		query string
 	)
 
-	if occurence == 0 {
+	if frequency == 0 {
 		query = "select quantity, isoyear, month from (" +
 			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
 			"from records where strftime('%m', date) = " + fmt.Sprintf("'%02d' ", int(month)) +
 			"and strftime('%Y', date) = " + fmt.Sprintf("'%d' ", year) + condition +
 			") where quantity is not null"
 	} else {
-		y, m := computeLimitMonth(year, int(month), occurence)
+		y, m := computeLimitMonth(year, int(month), frequency)
 		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%02d' ", int(m))
 
 		query = "select quantity, isoyear, month from (" +
@@ -114,7 +114,7 @@ func (db *DB) queryMonth(occurence, category int) ([]timeData, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) queryYear(occurence, category int) ([]timeData, error) {
+func (db *DB) queryYear(frequency, category int) ([]timeData, error) {
 	var (
 		year      = time.Now().Year()
 		condition = catCondition(category)
@@ -123,12 +123,12 @@ func (db *DB) queryYear(occurence, category int) ([]timeData, error) {
 		query string
 	)
 
-	if occurence == 0 {
+	if frequency == 0 {
 		query = fmt.Sprintf("select quantity, isoyear from ("+
 			"select sum(qty) as quantity, isoyear from records "+
 			"where isoyear = %d %s) where quantity is not null", year, condition)
 	} else {
-		year = year - occurence
+		year = year - frequency
 
 		query = fmt.Sprintf("select quantity, isoyear from ("+
 			"select sum(qty) as quantity, isoyear from records "+

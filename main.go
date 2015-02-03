@@ -187,7 +187,7 @@ func main() {
 					Value: "w",
 				},
 				cli.IntFlag{
-					Name:  "occurence, o",
+					Name:  "frequency, f",
 					Value: 2,
 				},
 				cli.IntFlag{
@@ -201,7 +201,7 @@ func main() {
 			Action: func(c *cli.Context) {
 				var (
 					period      = c.String("period")
-					occurence   = c.Int("occurence")
+					frequency   = c.Int("frequency")
 					category    = c.Int("category")
 					trackers    = c.StringSlice("t")
 					trackerslen = len(trackers)
@@ -209,8 +209,8 @@ func main() {
 					chkeys = make(chan []string, 1)
 				)
 
-				if occurence < 0 {
-					occurence = 0
+				if frequency < 0 {
+					frequency = 0
 				}
 
 				title, err := periodLabel(period)
@@ -219,7 +219,7 @@ func main() {
 					return
 				}
 
-				go keys(period, occurence, chkeys)
+				go keys(period, frequency, chkeys)
 
 				if trackerslen == 0 {
 					trackers = append(trackers, DEFAULT_DB)
@@ -262,11 +262,11 @@ func main() {
 
 							switch period {
 							case "w":
-								res, cerr = db.queryWeek(occurence, category)
+								res, cerr = db.queryWeek(frequency, category)
 							case "m":
-								res, cerr = db.queryMonth(occurence, category)
+								res, cerr = db.queryMonth(frequency, category)
 							case "y":
-								res, cerr = db.queryYear(occurence, category)
+								res, cerr = db.queryYear(frequency, category)
 							}
 							return cerr
 						})
