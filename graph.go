@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strings"
@@ -58,44 +59,46 @@ func (g *Graph) Print() {
 
 	offset := strings.Repeat(" ", g.offset)
 	for i := 0; i < g.height; i++ {
-		last, penult, line := i == g.height-1, i == g.height-2, ""
+		var line bytes.Buffer
+
+		last, penult := i == g.height-1, i == g.height-2
 		for j := 0; j < g.width; j++ {
 			if last {
 				if label, ok := g.ord[j]; ok {
-					line += label
+					line.WriteString(label)
 					j += len(label) - 1
 				} else if j == g.offset {
-					line += "|"
+					line.WriteString("|")
 				} else {
-					line += " "
+					line.WriteString(" ")
 				}
 			} else if penult {
 				if j == g.offset {
-					line += "|"
+					line.WriteString("|")
 				} else {
-					line += "_"
+					line.WriteString("_")
 				}
 			} else if j == g.offset {
-				line += "|"
+				line.WriteString("|")
 			} else if j == 0 {
 				if val, ok := g.abs[i]; ok {
 					sval := fmt.Sprintf("%v", val)
 
 					if diff := g.offset - len(sval); diff > 0 {
-						line += strings.Repeat(" ", diff)
+						line.WriteString(strings.Repeat(" ", diff))
 					}
-					line += sval
+					line.WriteString(sval)
 				} else {
-					line += offset
+					line.WriteString(offset)
 				}
 			} else if g.hasPoint(j, i) {
-				line += "+"
+				line.WriteString("+")
 			} else if j > g.offset {
-				line += " "
+				line.WriteString(" ")
 			}
 
 		}
-		fmt.Print(line, "\n")
+		fmt.Print(line.String(), "\n")
 	}
 }
 

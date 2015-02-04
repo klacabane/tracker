@@ -24,8 +24,8 @@ func TestMain(t *testing.M) {
 func TestComputeOrd(t *testing.T) {
 	assert.Equal(t, 3, len(graph.values))
 
-	graph.setPaddingLeft()
-	assert.Equal(t, 4, graph.paddingLeft)
+	graph.setOffset()
+	assert.Equal(t, 4, graph.offset)
 
 	graph.computeOrd()
 	assert.Equal(t, "1", graph.ord[5+marginX/2])

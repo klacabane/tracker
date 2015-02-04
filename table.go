@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 )
@@ -166,43 +167,40 @@ func (t *Table) computeSeparator() {
 		t.adjustTitleDiff()
 	}
 
-	t.separator = "+"
+	b := bytes.NewBufferString("+")
 	for _, col := range t.columns {
 		fullWidth := col.width + t.Padding*2
 
-		t.separator += strings.Repeat("-", fullWidth)
-		t.separator += "+"
+		b.WriteString(strings.Repeat("-", fullWidth))
+		b.WriteString("+")
 	}
+	t.separator = b.String()
 }
 
 func (t *Table) printRow(row []string) {
-	tpl := "|"
+	b := bytes.NewBufferString("|")
 	for i, field := range row {
-		tpl += strings.Repeat(" ", t.Padding)
-		tpl += field
+		b.WriteString(strings.Repeat(" ", t.Padding))
+		b.WriteString(field)
 
 		if diff := t.columns[i].width - len(field); diff > 0 {
-			tpl += strings.Repeat(" ", diff)
+			b.WriteString(strings.Repeat(" ", diff))
 		}
 
-		tpl += strings.Repeat(" ", t.Padding)
-		tpl += "|"
+		b.WriteString(strings.Repeat(" ", t.Padding))
+		b.WriteString("|")
 	}
 
-	fmt.Println(tpl)
+	fmt.Println(b.String())
 }
 
 func (t *Table) printTitle() {
-	separator := strings.Replace(t.separator[1:len(t.separator)-1], "+", "-", -1)
-	separator = "+" + separator + "+"
+	separator := "+" + strings.Replace(t.separator[1:len(t.separator)-1], "+", "-", -1) + "+"
 
 	diff := t.Padding + t.titleDiff
 
-	tpl := "|"
-	tpl += strings.Repeat(" ", t.Padding)
-	tpl += strings.ToUpper(t.Title)
-	tpl += strings.Repeat(" ", diff)
-	tpl += "|"
+	tpl := "|" + strings.Repeat(" ", t.Padding) +
+		strings.ToUpper(t.Title) + strings.Repeat(" ", diff) + "|"
 
 	fmt.Println(separator)
 	fmt.Println(tpl)
