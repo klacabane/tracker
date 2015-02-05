@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	TRACKER_DIR, BASE_DB, DEFAULT_DB string
+	TRACKER_DIR, DEFAULT_DB string
 )
 
 func init() {
@@ -18,8 +18,8 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
 	TRACKER_DIR = u.HomeDir + "/Dropbox/tracker/"
-	BASE_DB = "conf/base"
 	DEFAULT_DB = "default"
 }
 
@@ -212,13 +212,6 @@ func main() {
 				if frequency < 0 {
 					frequency = 0
 				}
-
-				title, err := periodLabel(period)
-				if err != nil {
-					fmt.Println(err)
-					return
-				}
-
 				go keys(period, frequency, chkeys)
 
 				if trackerslen == 0 {
@@ -227,7 +220,7 @@ func main() {
 				}
 
 				if trackerslen == 1 {
-					if title = trackers[0]; title == "all" {
+					if trackers[0] == "all" {
 						var err error
 
 						trackers, err = dblist()
@@ -244,74 +237,30 @@ func main() {
 					fmt.Println("ignoring category flag.")
 				}
 
-				chres := make(chan result, trackerslen)
-				for _, tracker := range trackers {
-					go func(dbname string) {
-						var res []timeData
-
-						err = withDBContext(dbname, func(db *DB) error {
-							var cerr error
-
-							if category > 0 {
-								name, cerr := db.getCategory(category)
-								if cerr != nil {
-									return cerr
-								}
-								title += " " + name
-							}
-
-							switch period {
-							case "w":
-								res, cerr = db.queryWeek(frequency, category)
-							case "m":
-								res, cerr = db.queryMonth(frequency, category)
-							case "y":
-								res, cerr = db.queryYear(frequency, category)
-							}
-							return cerr
-						})
-						chres <- result{err: err, values: res}
-					}(tracker)
+				f := NewFetcher(frequency, category, period, trackers)
+				if err := f.Exec(); err != nil {
+					fmt.Println(err)
+					return
 				}
 
-				var (
-					component UIComponent
-
-					rows = make(map[string]int64)
-				)
-				for i := 0; i < trackerslen; i++ {
-					res := <-chres
-					if res.err != nil {
-						fmt.Println(res.err)
-						if res.err == ErrInvalidDB {
-							continue
-						}
-						return
-					}
-
-					for _, data := range res.values {
-						rows[data.Key()] += data.Quantity()
-					}
-				}
-
-				labels := <-chkeys
+				var component UIComponent
 				if c.Bool("graph") {
 					rowsf := make(map[string]float64)
-					for k, v := range rows {
+					for k, v := range f.data {
 						rowsf[k] = float64(v) / 100
 					}
 
-					component = NewGraph(labels, rowsf)
+					component = NewGraph(<-chkeys, rowsf)
 				} else {
 					table, total := NewTable(2), int64(0)
-					for _, k := range labels {
-						sum := rows[k]
+					for _, k := range <-chkeys {
+						sum := f.data[k]
 
 						total += sum
 						table.Add(k, float64(sum)/100)
 					}
 					table.Add("Total", float64(total)/100)
-					table.Title = title
+					table.Title = f.title
 
 					component = table
 				}

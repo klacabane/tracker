@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -230,7 +229,7 @@ func dblist() ([]string, error) {
 
 	for _, f := range files {
 		n := f.Name()
-		if !f.IsDir() && strings.Contains(n, ".db") {
+		if !f.IsDir() && strings.HasSuffix(n, ".db") {
 			names = append(names, strings.TrimSuffix(n, ".db"))
 		}
 	}
@@ -253,19 +252,21 @@ func open(p string) (*DB, error) {
 }
 
 func create(p string) error {
-	in, err := os.Open(dbpath(BASE_DB))
+	if _, err := os.Create(p); err != nil {
+		return err
+	}
+
+	db, err := sql.Open("sqlite3", p)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
+	defer db.Close()
 
-	out, err := os.Create(p)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, in)
+	_, err = db.Exec("CREATE TABLE categories(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, name text NOT NULL);" +
+		"CREATE TABLE records(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, qty integer NOT NULL, " +
+		"date integer NOT NULL DEFAULT CURRENT_DATE, category integer NOT NULL DEFAULT 1, isoweek integer NOT NULL, " +
+		"isoyear integer NOT NULL);" +
+		"INSERT INTO categories(name) VALUES('default');")
 	return err
 }
 
