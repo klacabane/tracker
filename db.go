@@ -218,7 +218,6 @@ func catCondition(category int) (cond string) {
 	return
 }
 
-// Helpers
 func dblist() ([]string, error) {
 	var names []string
 
@@ -262,11 +261,18 @@ func create(p string) error {
 	}
 	defer db.Close()
 
-	_, err = db.Exec("CREATE TABLE categories(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, name text NOT NULL);" +
-		"CREATE TABLE records(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, qty integer NOT NULL, " +
+	exec := func(query string) {
+		if err != nil {
+			return
+		}
+		_, err = db.Exec(query)
+	}
+
+	exec("CREATE TABLE categories(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, name text NOT NULL)")
+	exec("CREATE TABLE records(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, qty integer NOT NULL, " +
 		"date integer NOT NULL DEFAULT CURRENT_DATE, category integer NOT NULL DEFAULT 1, isoweek integer NOT NULL, " +
-		"isoyear integer NOT NULL);" +
-		"INSERT INTO categories(name) VALUES('default');")
+		"isoyear integer NOT NULL)")
+	exec("INSERT INTO categories(name) VALUES('default')")
 	return err
 }
 
