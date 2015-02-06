@@ -105,9 +105,8 @@ func main() {
 							return cerr
 						}
 					}
-					year, week := time.Now().ISOWeek()
 
-					return db.addRecord(quantity, category, year, week)
+					return db.addRecord(quantity, category)
 				}); err != nil {
 					fmt.Println(err)
 				}
@@ -200,7 +199,7 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
-					period      = c.String("period")
+					period      = Periods[c.String("period")]
 					frequency   = c.Int("frequency")
 					category    = c.Int("category")
 					trackers    = c.StringSlice("t")
@@ -267,74 +266,16 @@ func main() {
 				component.Print()
 			},
 		},
-		{
-			Name: "graph",
-			Action: func(c *cli.Context) {
-				m := map[string]float64{
-					"1": 0.15,
-					"2": 0.100,
-					"3": 0.3000,
-					"4": 0.700,
-					"5": 0.1500,
-					"6": 0.110,
-					"7": 0.2900,
-					"8": 0.35551,
-				}
-				graph := NewGraph([]string{"1", "2", "3", "4", "5", "6", "7", "8"}, m)
-				graph.Print()
-			},
-		},
 	}
 
 	app.Run(os.Args)
 }
 
-func computeLimitMonth(year, month, n int) (int, int) {
-	for n > 0 {
-		month--
-		if month == 0 {
-			year--
-			month = 12
-		}
-		n--
-	}
-	return year, month
-}
-
-func computeLimitWeek(year, week, n int) (int, int) {
-	for n > 0 {
-		week--
-		if week == 0 {
-			year--
-			if isLongYear(year) {
-				week = 53
-			} else {
-				week = 52
-			}
-		}
-		n--
-	}
-	return year, week
-}
-
-func keys(p string, n int, c chan<- []string) {
+func keys(period Period, n int, c chan<- []string) {
 	var (
 		keys = make([]string, n+1)
-
-		date       = time.Now()
-		year, week = date.ISOWeek()
-		month      = int(date.Month())
-
-		data timeData
+		data = timeData{date: time.Now(), period: period}
 	)
-
-	if p == "w" {
-		data = timeData{year: year, week: week}
-	} else if p == "m" {
-		data = timeData{year: year, month: month}
-	} else {
-		data = timeData{year: year}
-	}
 
 	for n >= 0 {
 		keys[n] = data.Key()
@@ -343,28 +284,4 @@ func keys(p string, n int, c chan<- []string) {
 		n--
 	}
 	c <- keys
-}
-
-func isLongYear(year int) bool {
-	var (
-		start = time.Date(year, time.January, 1, 0, 0, 0, 0, time.Local)
-		end   = time.Date(year, time.December, 31, 0, 0, 0, 0, time.Local)
-
-		isLeap = year%4 == 0 && year%100 != 0 || year%400 == 0
-	)
-	return (isLeap && (start.Weekday() == time.Wednesday || end.Weekday() == time.Friday)) ||
-		(!isLeap && (start.Weekday() == time.Thursday || end.Weekday() == time.Friday))
-}
-
-func periodLabel(p string) (string, error) {
-	switch p {
-	case "w":
-		return "week", nil
-	case "m":
-		return "month", nil
-	case "y":
-		return "year", nil
-	default:
-		return "", fmt.Errorf("invalid period flag.")
-	}
 }

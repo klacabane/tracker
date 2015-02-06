@@ -4,25 +4,43 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 )
 
+type Period int
+
+const (
+	DAY Period = iota << 1
+	WEEK
+	MONTH
+	YEAR
+)
+
+var Periods = map[string]Period{
+	"d": DAY,
+	"w": WEEK,
+	"m": MONTH,
+	"y": YEAR,
+}
+
 type Fetcher struct {
-	title, period  string
+	title          string
 	freq, category int
+	period         Period
 	trackers       []string
 	data           map[string]int64
 	resc           chan result
 }
 
-func NewFetcher(freq, category int, period string, trackers []string) *Fetcher {
+func NewFetcher(freq, category int, period Period, trackers []string) *Fetcher {
 	return &Fetcher{
-		period:   period,
+		title:    strings.Join(trackers, " & "),
 		freq:     freq,
 		category: category,
+		period:   period,
 		trackers: trackers,
-		resc:     make(chan result, len(trackers)),
 		data:     make(map[string]int64),
-		title:    strings.Join(trackers, " & "),
+		resc:     make(chan result, len(trackers)),
 	}
 }
 
@@ -45,11 +63,12 @@ func (f *Fetcher) fetch() {
 				}
 
 				switch f.period {
-				case "w":
+				case DAY:
+				case WEEK:
 					res, cerr = db.queryWeek(f.freq, f.category)
-				case "m":
+				case MONTH:
 					res, cerr = db.queryMonth(f.freq, f.category)
-				case "y":
+				case YEAR:
 					res, cerr = db.queryYear(f.freq, f.category)
 				}
 				return cerr
@@ -90,17 +109,24 @@ type result struct {
 }
 
 type timeData struct {
-	qty               int64
-	year, month, week int
+	qty    int64
+	date   time.Time
+	period Period
 }
 
 func (data timeData) Key() string {
-	if data.week > 0 {
-		return fmt.Sprintf("%d-W%02d", data.year, data.week)
-	} else if data.month > 0 {
-		return fmt.Sprintf("%d-%02d", data.year, data.month)
+	switch data.period {
+	case DAY:
+		return fmt.Sprintf("%s %02d %s", data.date.Month().String(), data.date.Day(), data.date.Weekday().String())
+	case WEEK:
+		year, week := data.date.ISOWeek()
+		return fmt.Sprintf("W%02d %d", week, year)
+	case MONTH:
+		return fmt.Sprintf("%d %s", data.date.Year(), data.date.Month().String())
+	case YEAR:
+		return fmt.Sprintf("%d", data.date.Year())
 	}
-	return fmt.Sprintf("%d", data.year)
+	return "unknown"
 }
 
 func (data timeData) Quantity() int64 {
@@ -108,14 +134,17 @@ func (data timeData) Quantity() int64 {
 }
 
 func (data timeData) Prev() timeData {
-	var prev timeData
+	prev := timeData{period: data.period}
 
-	if data.week > 0 {
-		prev.year, prev.week = computeLimitWeek(data.year, data.week, 1)
-	} else if data.month > 0 {
-		prev.year, prev.month = computeLimitMonth(data.year, data.month, 1)
-	} else {
-		prev.year = data.year - 1
+	switch data.period {
+	case DAY:
+		prev.date = data.date.AddDate(0, 0, -1)
+	case WEEK:
+		prev.date = data.date.AddDate(0, 0, -7)
+	case MONTH:
+		prev.date = data.date.AddDate(0, -1, 0)
+	case YEAR:
+		prev.date = data.date.AddDate(-1, 0, 0)
 	}
 	return prev
 }

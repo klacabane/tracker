@@ -24,132 +24,63 @@ type DB struct {
 	*sql.DB
 }
 
-func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
-	var (
-		year, week = time.Now().ISOWeek()
-		condition  = catCondition(category)
-		res        = make([]timeData, 0)
-
-		query string
-	)
-
-	if frequency == 0 {
-		// query concerns current week
-		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
-			"select sum(qty) as quantity, isoyear, isoweek from records "+
-			"where isoyear = %d and isoweek = %d %sgroup by isoweek"+
-			") where quantity is not null", year, week, condition)
-	} else {
-		year, week = computeLimitWeek(year, week, frequency)
-
-		query = fmt.Sprintf("select quantity, isoyear, isoweek from ("+
-			"select sum(qty) as quantity, isoyear, isoweek from records "+
-			"where ((isoyear >= %d and isoweek >= %d) "+
-			"or isoyear > %d) %sgroup by isoweek) where quantity is not null", year, week, year, condition)
-	}
-
-	rows, err := db.Query(query)
+func (db *DB) query(q string, period Period) ([]timeData, error) {
+	rows, err := db.Query(q)
 	if err != nil {
-		return res, err
+		return []timeData{}, err
 	}
 	defer rows.Close()
 
-	var data timeData
+	var (
+		res  = make([]timeData, 0)
+		data = timeData{period: period}
+
+		datestr string
+	)
 	for rows.Next() {
-		err = rows.Scan(&data.qty, &data.year, &data.week)
+		err = rows.Scan(&data.qty, &datestr)
+		if err != nil {
+			return res, err
+		}
+
+		data.date, err = time.Parse("2006-01-02", datestr)
 		if err != nil {
 			return res, err
 		}
 		res = append(res, data)
 	}
-
 	return res, rows.Err()
+}
+
+func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
+	date := time.Now().AddDate(0, 0, -7*frequency)
+	year, week := date.ISOWeek()
+	qry := "select sum(records.qty) as quantity, records.date from records " +
+		"where ((strftime('%Y', date) >= " + itoa(year) +
+		" and (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1 >= " + itoa(week) + ") " +
+		"or strftime('%Y', date) > " + itoa(year) + ") " +
+		fmt.Sprintf("%sgroup by isoweek", catCondition(category))
+
+	return db.query(qry, WEEK)
 }
 
 func (db *DB) queryMonth(frequency, category int) ([]timeData, error) {
-	var (
-		date        = time.Now()
-		year, month = date.Year(), date.Month()
-		condition   = catCondition(category)
-		res         = make([]timeData, 0)
+	date := time.Now().AddDate(0, -1*frequency, 0)
+	year, month := date.Year(), int(date.Month())
+	qry := "select sum(records.qty) as quantity, records.date from records " +
+		"where ((strftime('%Y', records.date) >= " + itoa(year) + " and strftime('%m', records.date) >= " + fmt.Sprintf("%02d) ", month) +
+		"or strftime('%Y', records.date) > " + itoa(year) + ") " + catCondition(category) +
+		"group by strftime('%Y-%m', records.date)"
 
-		query string
-	)
-
-	if frequency == 0 {
-		query = "select quantity, isoyear, month from (" +
-			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
-			"from records where strftime('%m', date) = " + fmt.Sprintf("'%02d' ", int(month)) +
-			"and strftime('%Y', date) = " + fmt.Sprintf("'%d' ", year) + condition +
-			") where quantity is not null"
-	} else {
-		y, m := computeLimitMonth(year, int(month), frequency)
-		ystr, mstr := fmt.Sprintf("'%s' ", strconv.Itoa(y)), fmt.Sprintf("'%02d' ", int(m))
-
-		query = "select quantity, isoyear, month from (" +
-			"select sum(qty) as quantity, isoyear, strftime('%m', date) as month " +
-			"from records where ((strftime('%Y', date) >= " + ystr +
-			"and strftime('%m', date) >= " + mstr + ")" +
-			"or strftime('%Y', date) > " + ystr + ")" + condition +
-			"group by strftime('%Y-%m', date)" +
-			") where quantity is not null"
-	}
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return res, err
-	}
-	defer rows.Close()
-
-	var data timeData
-	for rows.Next() {
-		err = rows.Scan(&data.qty, &data.year, &data.month)
-		if err != nil {
-			return res, err
-		}
-		res = append(res, data)
-	}
-
-	return res, rows.Err()
+	return db.query(qry, MONTH)
 }
 
 func (db *DB) queryYear(frequency, category int) ([]timeData, error) {
-	var (
-		year      = time.Now().Year()
-		condition = catCondition(category)
-		res       = make([]timeData, 0)
+	date := time.Now().AddDate(-1*frequency, 0, 0)
+	qry := "select sum(records.qty) as quantity, records.date from records " +
+		"where isoyear >= " + itoa(date.Year()) + " " + catCondition(category) + "group by isoyear"
 
-		query string
-	)
-
-	if frequency == 0 {
-		query = fmt.Sprintf("select quantity, isoyear from ("+
-			"select sum(qty) as quantity, isoyear from records "+
-			"where isoyear = %d %s) where quantity is not null", year, condition)
-	} else {
-		year = year - frequency
-
-		query = fmt.Sprintf("select quantity, isoyear from ("+
-			"select sum(qty) as quantity, isoyear from records "+
-			"where isoyear >= %d %sgroup by isoyear) where quantity is not null", year, condition)
-	}
-
-	rows, err := db.Query(query)
-	if err != nil {
-		return res, err
-	}
-	defer rows.Close()
-
-	var data timeData
-	for rows.Next() {
-		err = rows.Scan(&data.qty, &data.year)
-		if err != nil {
-			return res, err
-		}
-		res = append(res, data)
-	}
-
-	return res, rows.Err()
+	return db.query(qry, YEAR)
 }
 
 func (db *DB) addCategories(names ...string) error {
@@ -205,9 +136,12 @@ func (db *DB) getCategories() (map[int]string, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) addRecord(qty int64, category, year, week int) error {
-	_, err := db.Exec("insert into records(qty, category, isoyear, isoweek) values(?, ?, ?, ?)",
-		qty, category, year, week)
+func (db *DB) addRecord(qty int64, category int) error {
+	if _, err := db.getCategory(category); err != nil {
+		return err
+	}
+
+	_, err := db.Exec("insert into records(qty, category) values(?, ?)", qty, category)
 	return err
 }
 
@@ -216,6 +150,10 @@ func catCondition(category int) (cond string) {
 		cond = fmt.Sprintf("and category = %d ", category)
 	}
 	return
+}
+
+func itoa(n int) string {
+	return strconv.Itoa(n)
 }
 
 func dblist() ([]string, error) {
