@@ -62,7 +62,7 @@ func TestCategories(t *testing.T) {
 }
 
 func TestAddRecord(t *testing.T) {
-	err := testDB.addRecord(1200, 2, year, week)
+	err := testDB.addRecord(1200, 2)
 	assert.Nil(t, err)
 }
 
@@ -72,7 +72,7 @@ func TestQueryWeek(t *testing.T) {
 
 	assert.Equal(t, 1, len(datas))
 	assert.Equal(t, 1200, datas[0].Quantity())
-	assert.Equal(t, fmt.Sprintf("%d-W%02d", year, week), datas[0].Key())
+	assert.Equal(t, fmt.Sprintf("W%02d %d", week, year), datas[0].Key())
 
 	datas, err = testDB.queryWeek(0, 3)
 	assert.Nil(t, err)
@@ -86,7 +86,7 @@ func TestQueryMonth(t *testing.T) {
 
 	assert.Equal(t, 1, len(datas))
 	assert.Equal(t, 1200, datas[0].Quantity())
-	assert.Equal(t, fmt.Sprintf("%d-%02d", year, month), datas[0].Key())
+	assert.Equal(t, fmt.Sprintf("%d %s", date.Year(), date.Month().String()), datas[0].Key())
 
 	datas, err = testDB.queryMonth(0, 1)
 	assert.Nil(t, err)
@@ -100,7 +100,7 @@ func TestQueryYear(t *testing.T) {
 
 	assert.Equal(t, 1, len(datas))
 	assert.Equal(t, 1200, datas[0].Quantity())
-	assert.Equal(t, fmt.Sprintf("%d", year), datas[0].Key())
+	assert.Equal(t, fmt.Sprintf("%d", date.Year()), datas[0].Key())
 
 	datas, err = testDB.queryYear(0, 1)
 	assert.Nil(t, err)

@@ -58,8 +58,8 @@ func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
 	qry := "select sum(records.qty) as quantity, records.date from records " +
 		"where ((strftime('%Y', date) >= " + itoa(year) +
 		" and (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1 >= " + itoa(week) + ") " +
-		"or strftime('%Y', date) > " + itoa(year) + ") " +
-		fmt.Sprintf("%sgroup by isoweek", catCondition(category))
+		"or strftime('%Y', date) > " + itoa(year) + ") " + catCondition(category) +
+		"group by strftime('%Y', date), (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1"
 
 	return db.query(qry, WEEK)
 }
@@ -78,7 +78,8 @@ func (db *DB) queryMonth(frequency, category int) ([]timeData, error) {
 func (db *DB) queryYear(frequency, category int) ([]timeData, error) {
 	date := time.Now().AddDate(-1*frequency, 0, 0)
 	qry := "select sum(records.qty) as quantity, records.date from records " +
-		"where isoyear >= " + itoa(date.Year()) + " " + catCondition(category) + "group by isoyear"
+		"where strftime('%Y', records.date) >= " + itoa(date.Year()) + " " + catCondition(category) +
+		"group by strftime('%Y', records.date)"
 
 	return db.query(qry, YEAR)
 }
@@ -208,8 +209,7 @@ func create(p string) error {
 
 	exec("CREATE TABLE categories(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, name text NOT NULL)")
 	exec("CREATE TABLE records(id integer NOT NULL PRIMARY KEY AUTOINCREMENT, qty integer NOT NULL, " +
-		"date integer NOT NULL DEFAULT CURRENT_DATE, category integer NOT NULL DEFAULT 1, isoweek integer NOT NULL, " +
-		"isoyear integer NOT NULL)")
+		"date integer NOT NULL DEFAULT CURRENT_DATE, category integer NOT NULL DEFAULT 1)")
 	exec("INSERT INTO categories(name) VALUES('default')")
 	return err
 }
