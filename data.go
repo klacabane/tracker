@@ -64,6 +64,7 @@ func (f *Fetcher) fetch() {
 
 				switch f.period {
 				case DAY:
+					res, cerr = db.queryDay(f.freq, f.category)
 				case WEEK:
 					res, cerr = db.queryWeek(f.freq, f.category)
 				case MONTH:
