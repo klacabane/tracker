@@ -54,10 +54,12 @@ func (db *DB) query(q string, period Period) ([]timeData, error) {
 
 func (db *DB) queryDay(frequency, category int) ([]timeData, error) {
 	date := time.Now().AddDate(0, 0, -1*frequency)
+	month, day := fmt.Sprintf("'%02d'", int(date.Month())), fmt.Sprintf("'%02d'", date.Day())
 	qry := "select sum(records.qty) as quantity, records.date from records" +
 		" where strftime('%Y', records.date) >= '" + itoa(date.Year()) + "'" +
-		" and strftime('%m', records.date) >= " + fmt.Sprintf("'%02d'", int(date.Month())) +
-		" and strftime('%d', records.date) >= " + fmt.Sprintf("'%02d' ", date.Day()) + catCondition(category) +
+		" and (strftime('%m', records.date) > " + month +
+		" or (strftime('%m', records.date) = " + month +
+		" and strftime('%d', records.date) >= " + day + ")) " + catCondition(category) +
 		"group by strftime('%Y-%m-%d', records.date)"
 
 	return db.query(qry, DAY)
@@ -67,9 +69,9 @@ func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
 	date := time.Now().AddDate(0, 0, -7*frequency)
 	year, week := date.ISOWeek()
 	qry := "select sum(records.qty) as quantity, records.date from records " +
-		"where ((strftime('%Y', date) >= '" + itoa(year) + "'" +
+		"where (strftime('%Y', date) = '" + itoa(year) + "'" +
 		" and (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1 >= " + itoa(week) + ") " +
-		"or strftime('%Y', date) > '" + itoa(year) + "') " + catCondition(category) +
+		"or strftime('%Y', date) > '" + itoa(year) + "' " + catCondition(category) +
 		"group by strftime('%Y', date), (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1"
 
 	return db.query(qry, WEEK)
@@ -79,9 +81,10 @@ func (db *DB) queryMonth(frequency, category int) ([]timeData, error) {
 	date := time.Now().AddDate(0, -1*frequency, 0)
 	year, month := date.Year(), int(date.Month())
 	qry := "select sum(records.qty) as quantity, records.date from records " +
-		"where ((strftime('%Y', records.date) >= '" + itoa(year) + "' and strftime('%m', records.date) >= " + fmt.Sprintf("'%02d') ", month) +
-		"or strftime('%Y', records.date) > '" + itoa(year) + "') " + catCondition(category) +
+		"where (strftime('%Y', records.date) = '" + itoa(year) + "' and strftime('%m', records.date) >= " + fmt.Sprintf("'%02d') ", month) +
+		"or strftime('%Y', records.date) > '" + itoa(year) + "' " + catCondition(category) +
 		"group by strftime('%Y-%m', records.date)"
+	fmt.Println(qry)
 
 	return db.query(qry, MONTH)
 }
