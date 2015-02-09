@@ -150,14 +150,18 @@ func (t *Table) adjustTitleDiff() {
 	if diff := titleWidth - contentWidth; diff <= 0 {
 		t.titleDiff = -diff
 	} else {
-		chunk := diff / colNb
+		if colNb == 1 {
+			t.columns[0].width += diff
+		} else {
+			chunk := diff / colNb
 
-		for _, col := range t.columns {
-			col.width += chunk
-		}
+			for _, col := range t.columns {
+				col.width += chunk
+			}
 
-		if diff%2 > 0 {
-			t.columns[0].width++
+			if diff%2 > 0 {
+				t.columns[0].width++
+			}
 		}
 	}
 }
