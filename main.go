@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/user"
-	"time"
 
 	"github.com/codegangsta/cli"
 )
@@ -34,7 +33,7 @@ func main() {
 			Action: func(c *cli.Context) {
 				trackers, err := dblist()
 				if err != nil {
-					fmt.Println(err)
+					printErr(err)
 					return
 				}
 
@@ -65,7 +64,7 @@ func main() {
 
 				err := create(p)
 				if err != nil {
-					fmt.Println(err)
+					printErr(err)
 				}
 			},
 		},
@@ -108,7 +107,7 @@ func main() {
 
 					return db.addRecord(quantity, category)
 				}); err != nil {
-					fmt.Println(err)
+					printErr(err)
 				}
 			},
 		},
@@ -141,7 +140,7 @@ func main() {
 
 							return nil
 						}); err != nil {
-							fmt.Println(err)
+							printErr(err)
 						}
 					},
 				},
@@ -166,7 +165,7 @@ func main() {
 						if err := withDBContext(c.String("t"), func(db *DB) error {
 							return db.addCategories(c.StringSlice("cat")...)
 						}); err != nil {
-							fmt.Println(err)
+							printErr(err)
 						}
 					},
 				},
@@ -204,31 +203,26 @@ func main() {
 					category    = c.Int("category")
 					trackers    = c.StringSlice("t")
 					trackerslen = len(trackers)
-
-					chkeys = make(chan []string, 1)
 				)
 
 				if frequency < 0 {
 					frequency = 0
 				}
-				go keys(period, frequency, chkeys)
 
 				if trackerslen == 0 {
 					trackers = append(trackers, DEFAULT_DB)
 					trackerslen++
 				}
 
-				if trackerslen == 1 {
-					if trackers[0] == "all" {
-						var err error
+				if trackerslen == 1 && trackers[0] == "all" {
+					var err error
 
-						trackers, err = dblist()
-						if err != nil {
-							fmt.Println(err)
-							return
-						}
-						trackerslen = len(trackers)
+					trackers, err = dblist()
+					if err != nil {
+						printErr(err)
+						return
 					}
+					trackerslen = len(trackers)
 				}
 
 				if trackerslen > 1 && category != 0 {
@@ -236,30 +230,23 @@ func main() {
 					fmt.Println("ignoring category flag.")
 				}
 
-				f := NewFetcher(frequency, category, period, trackers)
+				f := NewFetcher(frequency, category,
+					period, trackers)
 				if err := f.Exec(); err != nil {
-					fmt.Println(err)
+					printErr(err)
 					return
 				}
 
 				var component UIComponent
 				if c.Bool("graph") {
-					rowsf := make(map[string]float64)
-					for k, v := range f.data {
-						rowsf[k] = float64(v) / 100
-					}
-
-					component = NewGraph(<-chkeys, rowsf)
+					component = NewGraph(f.Keys(), f.Data())
 				} else {
-					table, total := NewTable(2), int64(0)
-					for _, k := range <-chkeys {
-						sum := f.data[k]
-
-						total += sum
-						table.Add(k, float64(sum)/100)
+					table, data := NewTable(2), f.Data()
+					for _, k := range f.Keys() {
+						table.Add(k, data[k])
 					}
-					table.Add("Total", float64(total)/100)
-					table.Title = f.title
+					table.Add("Total", f.Sum())
+					table.Title = f.Title()
 
 					component = table
 				}
@@ -271,17 +258,6 @@ func main() {
 	app.Run(os.Args)
 }
 
-func keys(period Period, n int, c chan<- []string) {
-	var (
-		keys = make([]string, n+1)
-		data = timeData{date: time.Now(), period: period}
-	)
-
-	for n >= 0 {
-		keys[n] = data.Key()
-		data = data.Prev()
-
-		n--
-	}
-	c <- keys
+func printErr(err error) {
+	fmt.Println("ERROR:", err.Error())
 }

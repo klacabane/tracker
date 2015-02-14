@@ -7,8 +7,8 @@ import (
 )
 
 type Table struct {
-	Padding int
-	Title   string
+	CellPadding int
+	Title       string
 
 	rows    [][]string
 	columns []*column
@@ -24,9 +24,9 @@ type column struct {
 
 func NewTableNamedCols(col string, cols ...string) *Table {
 	t := &Table{
-		rows:    make([][]string, 0),
-		columns: make([]*column, len(cols)+1),
-		Padding: 2,
+		rows:        make([][]string, 0),
+		columns:     make([]*column, len(cols)+1),
+		CellPadding: 2,
 	}
 
 	t.columns[0] = &column{col, len(col)}
@@ -42,9 +42,9 @@ func NewTable(colNb int) *Table {
 	}
 
 	t := &Table{
-		rows:    make([][]string, 0),
-		columns: make([]*column, colNb),
-		Padding: 2,
+		rows:        make([][]string, 0),
+		columns:     make([]*column, colNb),
+		CellPadding: 2,
 	}
 
 	for i := 0; i < colNb; i++ {
@@ -138,11 +138,11 @@ func (t *Table) adjustTitleDiff() {
 		first, last, border := 0, colNb-1, 1
 		for i, col := range t.columns {
 			if i == first {
-				contentWidth += col.width + t.Padding + border
+				contentWidth += col.width + t.CellPadding + border
 			} else if i == last {
-				contentWidth += col.width + t.Padding
+				contentWidth += col.width + t.CellPadding
 			} else {
-				contentWidth += col.width + t.Padding*2 + border
+				contentWidth += col.width + t.CellPadding*2 + border
 			}
 		}
 	}
@@ -173,7 +173,7 @@ func (t *Table) computeSeparator() {
 
 	b := bytes.NewBufferString("+")
 	for _, col := range t.columns {
-		fullWidth := col.width + t.Padding*2
+		fullWidth := col.width + t.CellPadding*2
 
 		b.WriteString(strings.Repeat("-", fullWidth))
 		b.WriteString("+")
@@ -184,14 +184,14 @@ func (t *Table) computeSeparator() {
 func (t *Table) printRow(row []string) {
 	b := bytes.NewBufferString("|")
 	for i, field := range row {
-		b.WriteString(strings.Repeat(" ", t.Padding))
+		b.WriteString(strings.Repeat(" ", t.CellPadding))
 		b.WriteString(field)
 
 		if diff := t.columns[i].width - len(field); diff > 0 {
 			b.WriteString(strings.Repeat(" ", diff))
 		}
 
-		b.WriteString(strings.Repeat(" ", t.Padding))
+		b.WriteString(strings.Repeat(" ", t.CellPadding))
 		b.WriteString("|")
 	}
 
@@ -201,9 +201,9 @@ func (t *Table) printRow(row []string) {
 func (t *Table) printTitle() {
 	separator := "+" + strings.Replace(t.separator[1:len(t.separator)-1], "+", "-", -1) + "+"
 
-	diff := t.Padding + t.titleDiff
+	diff := t.CellPadding + t.titleDiff
 
-	tpl := "|" + strings.Repeat(" ", t.Padding) +
+	tpl := "|" + strings.Repeat(" ", t.CellPadding) +
 		strings.ToUpper(t.Title) + strings.Repeat(" ", diff) + "|"
 
 	fmt.Println(separator)

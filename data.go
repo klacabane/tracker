@@ -28,25 +28,32 @@ type Fetcher struct {
 	freq, category int
 	period         Period
 	trackers       []string
+	sortedKeys     []string
 	data           map[string]int64
 	resc           chan result
 }
 
 func NewFetcher(freq, category int, period Period, trackers []string) *Fetcher {
 	return &Fetcher{
-		title:    strings.Join(trackers, " & "),
-		freq:     freq,
-		category: category,
-		period:   period,
-		trackers: trackers,
-		data:     make(map[string]int64),
-		resc:     make(chan result, len(trackers)),
+		title:      strings.Join(trackers, " & "),
+		freq:       freq,
+		category:   category,
+		period:     period,
+		trackers:   trackers,
+		sortedKeys: make([]string, freq+1),
+		data:       make(map[string]int64),
+		resc:       make(chan result, len(trackers)),
 	}
 }
 
 func (f *Fetcher) fetch() {
 	var wg sync.WaitGroup
-	wg.Add(len(f.trackers))
+	wg.Add(len(f.trackers) + 1)
+
+	go func() {
+		defer wg.Done()
+		f.setKeys()
+	}()
 
 	for _, tracker := range f.trackers {
 		go func(dbname string) {
@@ -82,6 +89,15 @@ func (f *Fetcher) fetch() {
 	close(f.resc)
 }
 
+func (f *Fetcher) setKeys() {
+	tdata := timeData{date: time.Now(), period: f.period}
+
+	for i := f.freq; i >= 0; i-- {
+		f.sortedKeys[i] = tdata.Key()
+		tdata = tdata.Prev()
+	}
+}
+
 func (f *Fetcher) Exec() (err error) {
 	go f.fetch()
 
@@ -98,6 +114,30 @@ func (f *Fetcher) Exec() (err error) {
 		}
 	}
 	return
+}
+
+func (f *Fetcher) Data() map[string]float64 {
+	rowsf := map[string]float64{}
+	for k, v := range f.data {
+		rowsf[k] = float64(v) / 100
+	}
+	return rowsf
+}
+
+func (f *Fetcher) Keys() []string {
+	return f.sortedKeys
+}
+
+func (f *Fetcher) Sum() float64 {
+	var sum int64
+	for _, v := range f.data {
+		sum += v
+	}
+	return float64(sum) / 100
+}
+
+func (f *Fetcher) Title() string {
+	return f.title
 }
 
 type UIComponent interface {
