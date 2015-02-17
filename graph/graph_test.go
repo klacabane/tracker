@@ -1,7 +1,6 @@
-package main
+package graph
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,8 +9,6 @@ import (
 var graph *Graph
 
 func TestMain(m *testing.M) {
-	TRACKER_DIR, _ = os.Getwd()
-
 	labels := []string{"1", "2000", "3", "4"}
 	points := map[string]float64{
 		"1":    210,
@@ -19,7 +16,7 @@ func TestMain(m *testing.M) {
 		"3":    1000,
 		"4":    100,
 	}
-	graph = NewGraph(labels, points)
+	graph = New(labels, points)
 
 	m.Run()
 }

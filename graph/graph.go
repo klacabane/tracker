@@ -1,4 +1,4 @@
-package main
+package graph
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ type coord struct {
 	y int
 }
 
-func NewGraph(labels []string, points map[string]float64) *Graph {
+func New(labels []string, points map[string]float64) *Graph {
 	g := &Graph{
 		labels:      labels,
 		values:      make([]float64, 0),
@@ -210,7 +210,6 @@ func (g *Graph) setOffset() {
 	}
 }
 
-// helpers
 func contains(sl []float64, val float64) bool {
 	for _, v := range sl {
 		if v == val {

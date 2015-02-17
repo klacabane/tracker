@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/codegangsta/cli"
+	"github.com/klacabane/tracker/graph"
 )
 
 var (
@@ -244,7 +245,7 @@ func main() {
 					data       = fetcher.Data()
 				)
 				if c.Bool("graph") {
-					component = NewGraph(periodKeys, data)
+					component = graph.New(periodKeys, data)
 				} else {
 					table := NewTable(2)
 					table.Add(strings.Join(trackers, " & "), strings.Join(fetcher.CatNames(), " & "))

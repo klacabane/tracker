@@ -50,13 +50,14 @@ func NewFetcher(freq int, period Period, categories []int, trackers []string) *F
 }
 
 func (f *Fetcher) fetch() {
+	defer func() {
+		f.quit <- struct{}{}
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(len(f.trackers) + 1)
 
-	go func() {
-		defer wg.Done()
-		f.setKeys()
-	}()
+	go f.setKeys(&wg)
 
 	if len(f.categories) == 0 {
 		f.catnamec <- "all categories"
@@ -96,10 +97,11 @@ func (f *Fetcher) fetch() {
 	}
 
 	wg.Wait()
-	f.quit <- struct{}{}
 }
 
-func (f *Fetcher) setKeys() {
+func (f *Fetcher) setKeys(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	tdata := timeData{date: time.Now(), period: f.period}
 
 	for i := f.frequency; i >= 0; i-- {
