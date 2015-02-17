@@ -15,10 +15,17 @@ import (
 )
 
 var (
-	ErrInvalidDB       = errors.New("tracker doesnt exist.")
 	ErrInvalidCategory = errors.New("category doesnt exist.")
 	ErrNoName          = errors.New("tracker name required.")
 )
+
+type ErrInvalidDB struct {
+	db string
+}
+
+func (err *ErrInvalidDB) Error() string {
+	return fmt.Sprintf("tracker %s doesnt exist.", err.db)
+}
 
 type DB struct {
 	*sql.DB
@@ -52,46 +59,46 @@ func (db *DB) query(q string, period Period) ([]timeData, error) {
 	return res, rows.Err()
 }
 
-func (db *DB) queryDay(frequency, category int) ([]timeData, error) {
+func (db *DB) queryDay(frequency int, categories []int) ([]timeData, error) {
 	date := time.Now().AddDate(0, 0, -1*frequency)
 	month, day := fmt.Sprintf("'%02d'", int(date.Month())), fmt.Sprintf("'%02d'", date.Day())
 	qry := "select sum(records.qty) as quantity, records.date from records" +
 		" where strftime('%Y', records.date) >= '" + itoa(date.Year()) + "'" +
 		" and (strftime('%m', records.date) > " + month +
 		" or (strftime('%m', records.date) = " + month +
-		" and strftime('%d', records.date) >= " + day + ")) " + catCondition(category) +
+		" and strftime('%d', records.date) >= " + day + ")) " + catCondition(categories) +
 		"group by strftime('%Y-%m-%d', records.date)"
 
 	return db.query(qry, DAY)
 }
 
-func (db *DB) queryWeek(frequency, category int) ([]timeData, error) {
+func (db *DB) queryWeek(frequency int, categories []int) ([]timeData, error) {
 	date := time.Now().AddDate(0, 0, -7*frequency)
 	year, week := date.ISOWeek()
 	qry := "select sum(records.qty) as quantity, records.date from records " +
 		"where ((strftime('%Y', date) = '" + itoa(year) + "'" +
 		" and (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1 >= " + itoa(week) + ") " +
-		"or strftime('%Y', date) > '" + itoa(year) + "') " + catCondition(category) +
+		"or strftime('%Y', date) > '" + itoa(year) + "') " + catCondition(categories) +
 		"group by strftime('%Y', date), (strftime('%j', date(records.date, '-3 days', 'weekday 4')) - 1) / 7 + 1"
 
 	return db.query(qry, WEEK)
 }
 
-func (db *DB) queryMonth(frequency, category int) ([]timeData, error) {
+func (db *DB) queryMonth(frequency int, categories []int) ([]timeData, error) {
 	date := time.Now().AddDate(0, -1*frequency, 0)
 	year, month := date.Year(), int(date.Month())
 	qry := "select sum(records.qty) as quantity, records.date from records " +
 		"where ((strftime('%Y', records.date) = '" + itoa(year) + "' and strftime('%m', records.date) >= " + fmt.Sprintf("'%02d') ", month) +
-		"or strftime('%Y', records.date) > '" + itoa(year) + "') " + catCondition(category) +
+		"or strftime('%Y', records.date) > '" + itoa(year) + "') " + catCondition(categories) +
 		"group by strftime('%Y-%m', records.date)"
 
 	return db.query(qry, MONTH)
 }
 
-func (db *DB) queryYear(frequency, category int) ([]timeData, error) {
+func (db *DB) queryYear(frequency int, categories []int) ([]timeData, error) {
 	date := time.Now().AddDate(-1*frequency, 0, 0)
 	qry := "select sum(records.qty) as quantity, records.date from records " +
-		"where strftime('%Y', records.date) >= '" + itoa(date.Year()) + "' " + catCondition(category) +
+		"where strftime('%Y', records.date) >= '" + itoa(date.Year()) + "' " + catCondition(categories) +
 		"group by strftime('%Y', records.date)"
 
 	return db.query(qry, YEAR)
@@ -159,11 +166,17 @@ func (db *DB) addRecord(qty int64, category int) error {
 	return err
 }
 
-func catCondition(category int) (cond string) {
-	if category > 0 {
-		cond = fmt.Sprintf("and category = %d ", category)
+func catCondition(categories []int) string {
+	var cond string
+
+	if len(categories) > 0 {
+		cond = fmt.Sprintf("and (records.category = %d", categories[0])
+		for i := 1; i < len(categories); i++ {
+			cond += fmt.Sprintf(" or records.category = %d", categories[i])
+		}
+		cond += ")"
 	}
-	return
+	return cond
 }
 
 func itoa(n int) string {
@@ -243,7 +256,7 @@ func withDBContext(dbname string, fn func(*DB) error) error {
 
 	p := dbpath(dbname)
 	if !exists(p) {
-		return ErrInvalidDB
+		return &ErrInvalidDB{dbname}
 	}
 
 	db, err := open(p)

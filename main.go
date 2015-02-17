@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"strings"
 
 	"github.com/codegangsta/cli"
 )
@@ -11,6 +12,10 @@ import (
 var (
 	TRACKER_DIR, DEFAULT_DB string
 )
+
+type UIComponent interface {
+	Print()
+}
 
 func init() {
 	u, err := user.Current()
@@ -188,9 +193,9 @@ func main() {
 					Name:  "frequency, f",
 					Value: 2,
 				},
-				cli.IntFlag{
-					Name:  "category, cat",
-					Value: 0,
+				cli.IntSliceFlag{
+					Name:  "categories, cat",
+					Value: &cli.IntSlice{},
 				},
 				cli.BoolFlag{
 					Name: "graph, g",
@@ -198,9 +203,9 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
-					period      = Periods[c.String("period")]
-					frequency   = c.Int("frequency")
-					category    = c.Int("category")
+					period      = Periods[c.String("p")]
+					frequency   = c.Int("f")
+					categories  = c.IntSlice("cat")
 					trackers    = c.StringSlice("t")
 					trackerslen = len(trackers)
 				)
@@ -225,28 +230,29 @@ func main() {
 					trackerslen = len(trackers)
 				}
 
-				if trackerslen > 1 && category != 0 {
-					category = 0
-					fmt.Println("ignoring category flag.")
-				}
-
-				f := NewFetcher(frequency, category,
-					period, trackers)
-				if err := f.Exec(); err != nil {
+				fetcher := NewFetcher(frequency, period,
+					categories, trackers)
+				if err := fetcher.Exec(); err != nil {
 					printErr(err)
 					return
 				}
 
-				var component UIComponent
+				var (
+					component UIComponent
+
+					periodKeys = fetcher.PeriodKeys()
+					data       = fetcher.Data()
+				)
 				if c.Bool("graph") {
-					component = NewGraph(f.Keys(), f.Data())
+					component = NewGraph(periodKeys, data)
 				} else {
-					table, data := NewTable(2), f.Data()
-					for _, k := range f.Keys() {
+					table := NewTable(2)
+					table.Add(strings.Join(trackers, " & "), strings.Join(fetcher.CatNames(), " & "))
+
+					for _, k := range periodKeys {
 						table.Add(k, data[k])
 					}
-					table.Add("Total", f.Sum())
-					table.Title = f.Title()
+					table.Add("Total", fetcher.Sum())
 
 					component = table
 				}

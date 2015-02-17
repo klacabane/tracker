@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 )
@@ -24,25 +23,29 @@ var Periods = map[string]Period{
 }
 
 type Fetcher struct {
-	title          string
-	freq, category int
-	period         Period
-	trackers       []string
-	sortedKeys     []string
-	data           map[string]int64
-	resc           chan result
+	frequency  int
+	period     Period
+	categories []int
+	catnames   []string
+	trackers   []string
+	periodKeys []string
+	data       map[string]int64
+	resc       chan result
+	catnamec   chan string
+	quit       chan struct{}
 }
 
-func NewFetcher(freq, category int, period Period, trackers []string) *Fetcher {
+func NewFetcher(freq int, period Period, categories []int, trackers []string) *Fetcher {
 	return &Fetcher{
-		title:      strings.Join(trackers, " & "),
-		freq:       freq,
-		category:   category,
+		frequency:  freq,
+		categories: categories,
 		period:     period,
 		trackers:   trackers,
-		sortedKeys: make([]string, freq+1),
+		periodKeys: make([]string, freq+1),
 		data:       make(map[string]int64),
 		resc:       make(chan result, len(trackers)),
+		catnamec:   make(chan string, len(categories)),
+		quit:       make(chan struct{}, 1),
 	}
 }
 
@@ -55,6 +58,10 @@ func (f *Fetcher) fetch() {
 		f.setKeys()
 	}()
 
+	if len(f.categories) == 0 {
+		f.catnamec <- "all categories"
+	}
+
 	for _, tracker := range f.trackers {
 		go func(dbname string) {
 			defer wg.Done()
@@ -62,22 +69,25 @@ func (f *Fetcher) fetch() {
 			var res []timeData
 			err := withDBContext(dbname, func(db *DB) error {
 				var cerr error
+				var name string
 
-				if f.category > 0 {
-					if f.title, cerr = db.getCategory(f.category); cerr != nil {
+				for _, category := range f.categories {
+					name, cerr = db.getCategory(category)
+					if cerr != nil {
 						return cerr
 					}
+					f.catnamec <- name
 				}
 
 				switch f.period {
 				case DAY:
-					res, cerr = db.queryDay(f.freq, f.category)
+					res, cerr = db.queryDay(f.frequency, f.categories)
 				case WEEK:
-					res, cerr = db.queryWeek(f.freq, f.category)
+					res, cerr = db.queryWeek(f.frequency, f.categories)
 				case MONTH:
-					res, cerr = db.queryMonth(f.freq, f.category)
+					res, cerr = db.queryMonth(f.frequency, f.categories)
 				case YEAR:
-					res, cerr = db.queryYear(f.freq, f.category)
+					res, cerr = db.queryYear(f.frequency, f.categories)
 				}
 				return cerr
 			})
@@ -86,14 +96,14 @@ func (f *Fetcher) fetch() {
 	}
 
 	wg.Wait()
-	close(f.resc)
+	f.quit <- struct{}{}
 }
 
 func (f *Fetcher) setKeys() {
 	tdata := timeData{date: time.Now(), period: f.period}
 
-	for i := f.freq; i >= 0; i-- {
-		f.sortedKeys[i] = tdata.Key()
+	for i := f.frequency; i >= 0; i-- {
+		f.periodKeys[i] = tdata.Key()
 		tdata = tdata.Prev()
 	}
 }
@@ -101,16 +111,24 @@ func (f *Fetcher) setKeys() {
 func (f *Fetcher) Exec() (err error) {
 	go f.fetch()
 
-	for res := range f.resc {
-		if res.err != nil {
-			if err == nil {
-				err = res.err
+out:
+	for {
+		select {
+		case res := <-f.resc:
+			if res.err != nil {
+				if err == nil {
+					err = res.err
+				}
+				continue
 			}
-			continue
-		}
 
-		for _, data := range res.values {
-			f.data[data.Key()] += data.Quantity()
+			for _, data := range res.values {
+				f.data[data.Key()] += data.Quantity()
+			}
+		case name := <-f.catnamec:
+			f.catnames = append(f.catnames, name)
+		case <-f.quit:
+			break out
 		}
 	}
 	return
@@ -124,8 +142,8 @@ func (f *Fetcher) Data() map[string]float64 {
 	return rowsf
 }
 
-func (f *Fetcher) Keys() []string {
-	return f.sortedKeys
+func (f *Fetcher) PeriodKeys() []string {
+	return f.periodKeys
 }
 
 func (f *Fetcher) Sum() float64 {
@@ -136,12 +154,8 @@ func (f *Fetcher) Sum() float64 {
 	return float64(sum) / 100
 }
 
-func (f *Fetcher) Title() string {
-	return f.title
-}
-
-type UIComponent interface {
-	Print()
+func (f *Fetcher) CatNames() []string {
+	return f.catnames
 }
 
 type result struct {
