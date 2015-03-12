@@ -204,23 +204,21 @@ func main() {
 			},
 			Action: func(c *cli.Context) {
 				var (
-					period      = Periods[c.String("p")]
-					frequency   = c.Int("f")
-					categories  = c.IntSlice("cat")
-					trackers    = c.StringSlice("t")
-					trackerslen = len(trackers)
+					period     = Periods[c.String("p")]
+					frequency  = c.Int("f")
+					categories = c.IntSlice("cat")
+					trackers   = c.StringSlice("t")
 				)
 
 				if frequency < 0 {
 					frequency = 0
 				}
 
-				if trackerslen == 0 {
+				if len(trackers) == 0 {
 					trackers = append(trackers, DEFAULT_DB)
-					trackerslen++
 				}
 
-				if trackerslen == 1 && trackers[0] == "all" {
+				if len(trackers) == 1 && trackers[0] == "all" {
 					var err error
 
 					trackers, err = dblist()
@@ -228,7 +226,6 @@ func main() {
 						printErr(err)
 						return
 					}
-					trackerslen = len(trackers)
 				}
 
 				fetcher := NewFetcher(frequency, period,
