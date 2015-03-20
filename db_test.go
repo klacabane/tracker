@@ -117,6 +117,15 @@ func TestQueryYear(t *testing.T) {
 	assert.Nil(t, err)
 
 	assert.Equal(t, 0, len(datas))
+}
+
+func TestQueryLastContext(t *testing.T) {
+	data, err := testDB.queryLastRecord(1, DAY)
+	assert.Equal(t, "no data", err.Error())
+
+	data, err = testDB.queryLastRecord(2, DAY)
+	assert.Nil(t, err)
+	assert.Equal(t, 1200, data.Quantity())
 
 	testDB.Close()
 }

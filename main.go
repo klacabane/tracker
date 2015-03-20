@@ -74,6 +74,45 @@ func main() {
 				}
 			},
 		},
+		// Last
+		{
+			Name: "last",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "tracker, t",
+					Value: DEFAULT_DB,
+				},
+				cli.IntFlag{
+					Name:  "category, cat",
+					Value: 1,
+				},
+				cli.StringFlag{
+					Name:  "period, p",
+					Value: "d",
+				},
+			},
+			Action: func(c *cli.Context) {
+				var (
+					period = Periods[c.String("p")]
+					data   timeData
+				)
+
+				if err := withDBContext(c.String("t"), func(db *DB) error {
+					var e error
+
+					data, e = db.queryLastRecord(c.Int("cat"), period)
+					return e
+				}); err != nil {
+					printErr(err)
+					return
+				}
+
+				table := NewTable(2)
+				table.Add(c.String("t"), "last")
+				table.Add(data.Key(), float64(data.Quantity())/100)
+				table.Print()
+			},
+		},
 		// Add
 		{
 			Name: "add",

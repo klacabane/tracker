@@ -59,6 +59,22 @@ func (db *DB) query(q string, period Period) ([]timeData, error) {
 	return res, rows.Err()
 }
 
+func (db *DB) queryLastRecord(category int, period Period) (timeData, error) {
+	qry := "select records.qty, records.date from records " +
+		"where records.category = " + fmt.Sprintf("%d ", category) +
+		"order by records.date desc limit 1"
+	datas, err := db.query(qry, period)
+	if err != nil {
+		return timeData{}, err
+	}
+
+	if len(datas) == 0 {
+		return timeData{}, fmt.Errorf("no data")
+	}
+
+	return datas[0], nil
+}
+
 func (db *DB) queryDay(frequency int, categories []int) ([]timeData, error) {
 	date := time.Now().AddDate(0, 0, -1*frequency)
 	month, day := fmt.Sprintf("'%02d'", int(date.Month())), fmt.Sprintf("'%02d'", date.Day())
